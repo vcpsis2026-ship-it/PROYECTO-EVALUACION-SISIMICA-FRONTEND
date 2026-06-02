@@ -20,9 +20,8 @@ import '../../ui/screens/user_list_screen.dart';
 
 void main() async {
   await Supabase.initialize(
-    anonKey:
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzamJlanhycXVtcXBxZnB2cG1wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNjU5OTQsImV4cCI6MjA5NTg0MTk5NH0.j97oHACM1K6bM0QL_5fTEyNOX4CzgZqhyHglLxk9ekE",
-    url: "https://gsjbejxrqumqpqfpvpmp.supabase.co",
+   anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxbnp2YXh1Ym95aHBkaWl2YWx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MzI3ODcsImV4cCI6MjA5NjAwODc4N30.m4kmKIc9rIeGMx0pRUnfNgWf95kV2MANhFG0UacrJMg",
+    url: "https://qqnzvaxuboyhpdiivalu.supabase.co",
   );
   runApp(const MyApp());
 }
