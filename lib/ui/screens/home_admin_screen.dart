@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/home_services.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/permisos_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/home_response.dart';
+import '../../data/models/permiso_model.dart';
+import '../widgets/dynamic_menu_grid.dart';
 import 'buildings_screen.dart';
 import 'assessed_buildings_screen.dart';
+import 'building_registry_1_screen.dart';
 import 'profile_admin_screen.dart';
+import 'user_list_screen.dart';
 
 class HomeAdminScreen extends StatefulWidget {
   const HomeAdminScreen({super.key});
@@ -25,6 +30,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
   String? _errorMessage;
   HomeStatistics? _statistics;
   UserInfo? _userInfo;
+  List<MenuItemPermiso> _menuItems = [];
 
   @override
   void initState() {
@@ -35,11 +41,12 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
   Future<void> _loadUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final storedRole = prefs.getString('userRole') ?? '';
       setState(() {
         _userName = prefs.getString('userName') ?? 'Administrador';
         _userId = prefs.getString('userId');
         _token = prefs.getString('accessToken');
-        _userRole = prefs.getString('userRole') ?? 'admin';
+        _userRole = storedRole.isNotEmpty ? storedRole : 'administrador';
         _errorMessage = null;
       });
 
@@ -57,7 +64,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
       debugPrint('  - registrationSource: $registrationSource');
 
       // Verificar permisos de administrador
-      if (_userRole != 'admin') {
+      if (_userRole != 'administrador' && _userRole != 'admin') {
         _handleUnauthorizedAccess('Acceso denegado: Se requieren permisos de administrador');
         return;
       }
@@ -72,6 +79,9 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
         _handleInvalidSession('ID de usuario no encontrado');
         return;
       }
+
+      // Cargar menú desde permisos (cache o backend) antes de mostrar el body
+      await _loadMenuItems();
 
       // FLUJO ESPECÍFICO PARA ADMIN
       if (isFromRegistration) {
@@ -106,7 +116,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
 
       // VERIFICAR QUE REALMENTE ES ADMIN
       final localRole = prefs.getString('userRole')?.toLowerCase() ?? '';
-      if (localRole != 'admin') {
+      if (localRole != 'administrador') {
         _handleUnauthorizedAccess('El usuario registrado no es administrador');
         return;
       }
@@ -134,7 +144,8 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
         if (response.success && response.data != null) {
           final userData = response.data!;
 
-          if (userData.userInfo.rol.toLowerCase() != 'admin') {
+          final serverRole = userData.userInfo.rol.toLowerCase();
+          if (serverRole != 'administrador' && serverRole != 'admin') {
             _handleUnauthorizedAccess('El usuario no tiene permisos de administrador');
             return;
           }
@@ -161,10 +172,10 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
       if (!serverDataLoaded) {
         // CREAR UserInfo DE ADMIN CON DATOS DEL REGISTRO
         final localUserInfo = UserInfo(
-          idUsuario: int.tryParse(_userId ?? '0') ?? 0,
+          idUsuario: _userId ?? '',
           nombre: _userName,
           email: registrationEmail,
-          rol: 'admin',
+          rol: 'administrador',
         );
 
         // ESTADÍSTICAS VACÍAS PARA ADMIN RECIÉN REGISTRADO
@@ -234,7 +245,8 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
         final userData = response.data!;
 
         // Verificar que el usuario realmente es admin
-        if (userData.userInfo.rol.toLowerCase() != 'admin') {
+        final serverRole = userData.userInfo.rol.toLowerCase();
+        if (serverRole != 'administrador' && serverRole != 'admin') {
           _handleUnauthorizedAccess('El usuario no tiene permisos de administrador');
           return;
         }
@@ -311,7 +323,8 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
         final userData = response.data!;
 
         // Verificar permisos de admin
-        if (userData.userInfo.rol.toLowerCase() != 'admin') {
+        final serverRole = userData.userInfo.rol.toLowerCase();
+        if (serverRole != 'administrador' && serverRole != 'admin') {
           _handleUnauthorizedAccess('El usuario registrado no tiene permisos de administrador');
           return;
         }
@@ -351,17 +364,17 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
 
       // VERIFICAR QUE REALMENTE ES ADMIN
       final localRole = prefs.getString('userRole')?.toLowerCase() ?? '';
-      if (localRole != 'admin') {
+      if (localRole != 'administrador') {
         _handleUnauthorizedAccess('El usuario registrado no es administrador');
         return;
       }
 
       // CREAR UserInfo CON DATOS LOCALES DE ADMIN
       final localUserInfo = UserInfo(
-        idUsuario: int.tryParse(_userId ?? '0') ?? 0,
+        idUsuario: _userId ?? '',
         nombre: _userName,
         email: prefs.getString('userEmail') ?? '',
-        rol: 'admin',
+        rol: 'administrador',
       );
 
       // CREAR ESTADÍSTICAS VACÍAS PARA ADMIN
@@ -401,6 +414,58 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
         _loading = false;
         _errorMessage = 'Error configurando panel de administrador: $e';
       });
+    }
+  }
+
+  Future<void> _loadMenuItems() async {
+    // 1. Intentar desde caché
+    List<MenuItemPermiso> items = await PermisosService.loadFromCache();
+
+    // 2. Si caché vacío, fetch directo al backend
+    if (items.isEmpty) {
+      final rolId = await PermisosService.getRolId();
+      if (rolId != null && rolId.isNotEmpty) {
+        items = await PermisosService.fetchAndCache(rolId);
+      }
+    }
+
+    if (items.isNotEmpty && mounted) {
+      setState(() => _menuItems = items);
+    }
+  }
+
+  void _handleMenuTap(MenuItemPermiso item) {
+    Widget? screen;
+    switch (item.codigo) {
+      case 'edificios':
+        screen = const BuildingsScreen();
+        break;
+      case 'usuarios':
+        screen = const UserListScreen();
+        break;
+      case 'inspecciones':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Módulo Inspecciones — en desarrollo')),
+        );
+        return;
+      case 'catalogos':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Módulo Catálogos — en desarrollo')),
+        );
+        return;
+      case 'auditoria':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Módulo Auditoría — en desarrollo')),
+        );
+        return;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${item.nombre} — en desarrollo')),
+        );
+        return;
+    }
+    if (screen != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen!));
     }
   }
 
@@ -448,10 +513,10 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
       }
 
       // Asegurar que el rol de admin esté guardado
-      await prefs.setString('userRole', 'admin');
+      await prefs.setString('userRole', 'administrador');
 
       setState(() {
-        _userRole = 'admin';
+        _userRole = 'administrador';
       });
 
       debugPrint('SharedPreferences actualizado para admin');
@@ -984,44 +1049,42 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
             const SizedBox(width: 8),
             const Text(
               'Panel de Control',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: AppColors.text,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.text),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildAdminMenuOption(
-              context,
-              'Gestión de Edificios',
-              'https://cdn-icons-png.flaticon.com/512/1441/1441359.png',
-              Icons.apartment,
-                  () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const BuildingsScreen()),
-                );
-              },
-            ),
-            _buildAdminMenuOption(
-              context,
-              'Edificios Evaluados',
-              'https://cdn-icons-png.flaticon.com/128/12218/12218407.png',
-              Icons.assignment_turned_in,
-                  () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AssessedBuildingsPage()),
-                );
-              },
-            ),
-          ],
-        ),
+
+        // ── Menú dinámico desde permisos del backend ──
+        if (_menuItems.isNotEmpty)
+          DynamicMenuGrid(
+            items:       _menuItems,
+            onTap:       _handleMenuTap,
+            accentColor: Colors.red,
+          )
+        else
+          // Fallback estático mientras carga o si no hay caché
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _buildAdminMenuOption(
+                context, 'Edificios',
+                Icons.apartment,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BuildingsScreen())),
+              ),
+              _buildAdminMenuOption(
+                context, 'Edificios Evaluados',
+                Icons.assignment_turned_in,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssessedBuildingsPage())),
+              ),
+              _buildAdminMenuOption(
+                context, 'Usuarios',
+                Icons.people,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserListScreen())),
+              ),
+            ],
+          ),
       ],
     );
   }
@@ -1066,8 +1129,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
   Widget _buildAdminMenuOption(
       BuildContext context,
       String title,
-      String imageUrl,
-      IconData fallbackIcon,
+      IconData icon,
       VoidCallback onTap,
       ) {
     return Expanded(
@@ -1092,38 +1154,14 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.network(
-                imageUrl,
+              Container(
                 width: 60,
                 height: 60,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      fallbackIcon,
-                      size: 30,
-                      color: Colors.red,
-                    ),
-                  );
-                },
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    width: 60,
-                    height: 60,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.red,
-                      ),
-                    ),
-                  );
-                },
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 30, color: Colors.red),
               ),
               const SizedBox(height: 12),
               Text(

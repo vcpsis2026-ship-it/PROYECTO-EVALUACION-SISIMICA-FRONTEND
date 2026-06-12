@@ -458,6 +458,7 @@ class _ProfileAdminScreenState extends State<ProfileAdminScreen> {
   Color _getRoleColor(String role) {
     switch (role.toLowerCase()) {
       case 'admin':
+      case 'administrador':
         return Colors.red;
       case 'inspector':
         return Colors.blue;
@@ -471,6 +472,7 @@ class _ProfileAdminScreenState extends State<ProfileAdminScreen> {
   String _getRoleDisplayName(String role) {
     switch (role.toLowerCase()) {
       case 'admin':
+      case 'administrador':
         return 'Administrador';
       case 'inspector':
         return 'Inspector';

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/theme/app_colors.dart'; // 👈 importar AppColors
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/services/building_list_service.dart';
+import '../../data/models/building_list_response.dart';
 import 'profile_admin_screen.dart';
-import 'building_pdf_service.dart'; // Cambia la ruta por la correcta
+import 'building_pdf_service.dart';
+
 class AssessedBuildingsPage extends StatefulWidget {
   const AssessedBuildingsPage({super.key});
 
@@ -12,282 +14,275 @@ class AssessedBuildingsPage extends StatefulWidget {
 }
 
 class _AssessedBuildingsPageState extends State<AssessedBuildingsPage> {
-  final supabase = Supabase.instance.client;
-  late Future<List<Map<String, dynamic>>> _futureEdificios;
-  List<Map<String, dynamic>> _edificios = [];
-  List<Map<String, dynamic>> _filteredEdificios = [];
+  List<BuildingData> _edificios = [];
+  List<BuildingData> _filteredEdificios = [];
+  bool _isLoading = true;
+  String? _error;
   int _selectedIndex = 0;
   String? _userId;
   String? _token;
   final TextEditingController _searchController = TextEditingController();
 
-  Future<List<Map<String, dynamic>>> _getEdificios() async {
-    final response = await supabase
-        .from('edificios')
-        .select('*')
-        .order('id_edificio', ascending: false);
-    return List<Map<String, dynamic>>.from(response);
-  }
-
   @override
   void initState() {
     super.initState();
-    _loadSessionData();
-    _futureEdificios = _getEdificios();
     _searchController.addListener(_onSearchChanged);
+    _loadSessionAndData();
+  }
+
+  Future<void> _loadSessionAndData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userId = prefs.getString('userId');
+      _token  = prefs.getString('accessToken');
+    });
+    await _loadEdificios();
+  }
+
+  Future<void> _loadEdificios() async {
+    setState(() {
+      _isLoading = true;
+      _error     = null;
+    });
+    try {
+      final response = await BuildingListService.getBuildings();
+      if (response.success && response.buildings != null) {
+        setState(() {
+          _edificios         = response.buildings!;
+          _filteredEdificios = List.from(_edificios);
+          _isLoading         = false;
+        });
+      } else {
+        setState(() {
+          _error     = response.error ?? 'Error cargando edificios';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error     = 'Error de conexión: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   void _onSearchChanged() {
     final query = _searchController.text.toLowerCase();
-
     setState(() {
-      if (query.isEmpty) {
-        _filteredEdificios = List.from(_edificios);
-      } else {
-        _filteredEdificios = _edificios.where((edificio) {
-          final nombre = (edificio['nombre_edificio'] ?? "").toLowerCase();
-          return nombre.contains(query);
-        }).toList();
-      }
-    });
-  }
-
-  Future<void> _loadSessionData() async {
-    final prefs = await await SharedPreferences.getInstance();
-    setState(() {
-      _userId = prefs.getString('userId');
-      _token = prefs.getString('accessToken');
+      _filteredEdificios = query.isEmpty
+          ? List.from(_edificios)
+          : _edificios
+              .where((e) => e.nombreEdificio.toLowerCase().contains(query))
+              .toList();
     });
   }
 
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
     if (index == 0) {
-      Navigator.pushNamed(context, '/home');
-    } else if (index == 1) {
-      // Si tenemos los datos, vamos al perfil real
-      if (_userId != null && _token != null) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProfileAdminScreen(
-              userId: _userId,
-              token: _token,
-            ),
-          ),
-        );
-      } else {
-        // Si no hay datos, enviamos al login o mostramos error
-        Navigator.pushNamed(context, '/');
-      }
+      Navigator.pop(context); // volver al home
+    } else if (index == 1 && _userId != null && _token != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProfileAdminScreen(userId: _userId, token: _token),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background, // 👈 Usando AppColors
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              height: 28,
-              color: AppColors.primary,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8.0,
-              ),
-              child: const Text(
-                "SismosApp",
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            Container(
-              color: AppColors.primary,
-              padding: const EdgeInsets.symmetric(
-                vertical: 12.0,
-                horizontal: 16.0,
-              ),
-              width: double.infinity,
-              child: const Text(
-                "Edificios",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            Expanded(
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: _futureEdificios,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        "Error: ${snapshot.error}",
-                        style: const TextStyle(color: AppColors.error),
-                      ),
-                    );
-                  }
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        "No hay edificios registrados",
-                        style: TextStyle(color: AppColors.gray500),
-                      ),
-                    );
-                  }
-
-                  if (_edificios.isEmpty) {
-                    _edificios = snapshot.data!;
-                    _filteredEdificios = List.from(_edificios);
-                  }
-
-                  return Column(
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12.0,
-                          vertical: 8.0,
-                        ),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            "Edificios Evaluados",
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.text,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            hintText: "Buscar edificio por nombre...",
-                            prefixIcon: const Icon(Icons.search),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: GridView.builder(
-                          padding: const EdgeInsets.all(12),
-                          gridDelegate:
-                              const SliverGridDelegateWithMaxCrossAxisExtent(
-                                maxCrossAxisExtent: 220,
-                                mainAxisSpacing: 12,
-                                crossAxisSpacing: 12,
-                                childAspectRatio: 0.75,
-                              ),
-                          itemCount: _filteredEdificios.length,
-                          itemBuilder: (context, index) { // 👈 Asegúrate de incluir (context, index) aquí
-                            final edificio = _filteredEdificios[index];
-
-                            // Extraemos el ID asegurándonos de que sea un int
-                            final int idEdificio = edificio['id_edificio'] ?? 0;
-
-                            return Card(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    // Imagen del edificio
-                                    if (edificio['foto_edificio_url'] != null)
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.network(
-                                          edificio['foto_edificio_url'],
-                                          height: 80,
-                                          width: 100,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-
-                                    const SizedBox(height: 8),
-
-                                    // Nombre del edificio
-                                    Text(
-                                      edificio['nombre_edificio'] ?? "Sin nombre",
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.text,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
-                                    ),
-
-                                    const SizedBox(height: 8),
-
-                                    // BOTÓN PDF
-                                    ElevatedButton.icon(
-                                      onPressed: () async {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text("Generando reporte PDF...")),
-                                        );
-                                        // Llamada al servicio
-                                        await BuildingPdfService.generateFullReport(idEdificio);
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.red.shade700,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                      ),
-                                      icon: const Icon(Icons.picture_as_pdf, size: 18),
-                                      label: const Text("PDF", style: TextStyle(fontSize: 12)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Edificios Evaluados'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadEdificios,
+            tooltip: 'Actualizar',
+          ),
+        ],
       ),
+      body: _buildBody(),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.home),   label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
         ],
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        selectedItemColor: AppColors.primary,
+        selectedItemColor:   AppColors.primary,
         unselectedItemColor: AppColors.gray500,
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Cargando edificios...', style: TextStyle(color: AppColors.gray500)),
+          ],
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.gray500),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadEdificios,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_edificios.isEmpty) {
+      return const Center(
+        child: Text(
+          'No hay edificios registrados',
+          style: TextStyle(color: AppColors.gray500),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Buscar edificio por nombre...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.primary),
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${_filteredEdificios.length} edificio(s)',
+              style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+            ),
+          ),
+        ),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(12),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent:  220,
+              mainAxisSpacing:      12,
+              crossAxisSpacing:     12,
+              childAspectRatio:    0.75,
+            ),
+            itemCount: _filteredEdificios.length,
+            itemBuilder: (context, index) {
+              final edificio = _filteredEdificios[index];
+              return _buildEdificioCard(edificio);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEdificioCard(BuildingData edificio) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Foto del edificio
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: edificio.fotoUrl != null
+                  ? Image.network(
+                      edificio.fotoUrl!,
+                      height: 80,
+                      width: 100,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const _EdificioPlaceholder(),
+                    )
+                  : const _EdificioPlaceholder(),
+            ),
+            const SizedBox(height: 8),
+            // Nombre
+            Text(
+              edificio.nombreEdificio,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: AppColors.text,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+            // Dirección (si existe)
+            if (edificio.direccion != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                edificio.direccion!,
+                style: const TextStyle(fontSize: 11, color: AppColors.gray500),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 8),
+            // Botón PDF
+            ElevatedButton.icon(
+              onPressed: () async {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Generando reporte PDF...')),
+                );
+                await BuildingPdfService.generateFullReport(edificio.idEdificio);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.picture_as_pdf, size: 18),
+              label: const Text('PDF', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -296,5 +291,18 @@ class _AssessedBuildingsPageState extends State<AssessedBuildingsPage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+}
+
+class _EdificioPlaceholder extends StatelessWidget {
+  const _EdificioPlaceholder();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 80,
+      width: 100,
+      color: Colors.grey.shade200,
+      child: const Icon(Icons.apartment, size: 40, color: Colors.grey),
+    );
   }
 }

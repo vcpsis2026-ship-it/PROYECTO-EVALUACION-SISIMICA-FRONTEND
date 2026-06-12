@@ -1,8 +1,10 @@
 class AuthResponse {
   final bool success;
   final String? token;
-  final int? userId; // Tu servidor devuelve userId en lugar de user completo
+  final String? userId;
   final String? nombre;
+  final String? rolId;
+  final String? rolCodigo;
   final String message;
   final String? error;
   final int? statusCode;
@@ -12,23 +14,28 @@ class AuthResponse {
     this.token,
     this.userId,
     this.nombre,
+    this.rolId,
+    this.rolCodigo,
     required this.message,
     this.error,
     this.statusCode,
   });
 
-  // Respuesta exitosa - CORREGIDO
   factory AuthResponse.success({
     String? token,
-    int? userId,
-    String? nombre, // CORREGIDO: Agregar nombre como parámetro separado
+    String? userId,
+    String? nombre,
+    String? rolId,
+    String? rolCodigo,
     required String message,
   }) {
     return AuthResponse._(
       success: true,
       token: token,
       userId: userId,
-      nombre: nombre, // CORREGIDO: Asignar el nombre
+      nombre: nombre,
+      rolId: rolId,
+      rolCodigo: rolCodigo,
       message: message,
     );
   }
@@ -46,11 +53,9 @@ class AuthResponse {
     );
   }
 
-  // Obtener ID del usuario
-  int? get userIdValue => userId;
-
-  // Obtener nombre del usuario con fallback
+  String? get userIdValue => userId;
   String get userNameValue => nombre ?? 'Usuario';
+  String get userRoleValue => rolCodigo ?? '';
 
   // Verificar si tiene token válido
   bool get hasValidToken => token != null && token!.isNotEmpty;

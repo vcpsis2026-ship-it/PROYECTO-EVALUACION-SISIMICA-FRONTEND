@@ -3,247 +3,132 @@ import 'database_service.dart';
 import '../../data/models/database_response.dart';
 import '../../data/models/auth_response.dart';
 
-
 class AuthService {
-
-  // LOGIN con retry automático
+  // ── LOGIN ──────────────────────────────────────────────────────
   static Future<AuthResponse> login({
     required String email,
     required String password,
-    int maxRetries = 2, // Máximo 2 intentos
+    int maxRetries = 2,
   }) async {
-    // Verificar conexión antes de intentar login
+    // 1. Verificar conexión
     try {
-      final connectionCheck = await DatabaseService.checkConnection();
-      if (!connectionCheck.success) {
+      final conn = await DatabaseService.checkConnection();
+      if (!conn.success) {
         return AuthResponse.failure(
-          error: 'Sin conexión al servidor. ${connectionCheck.error}',
-        );
+            error: 'Sin conexión al servidor. ${conn.error}');
       }
     } catch (e) {
-      return AuthResponse.failure(
-        error: 'Error de conexión: $e',
-      );
+      return AuthResponse.failure(error: 'Error de conexión: $e');
     }
 
-    int attemptCount = 0;
-
-    while (attemptCount < maxRetries) {
-      attemptCount++;
-
+    // 2. Intentar login
+    int attempt = 0;
+    while (attempt < maxRetries) {
+      attempt++;
       try {
-        print('AuthService: Intento $attemptCount/$maxRetries para $email');
+        print('[AuthService] Login intento $attempt/$maxRetries → $email');
 
         final response = await DatabaseService.post<Map<String, dynamic>>(
           DatabaseEndpoints.login,
-          {
-            "email": email.trim(),
-            "password": password,
-          },
+          {'email': email.trim(), 'password': password},
         );
 
-        print('Response data: ${response.data}');
-
         if (response.success && response.data != null) {
-          final data = response.data!;
-          final success = data['success'] ?? false;
-          final token = data['token'];
-          final userId = data['userId']; // CORREGIDO: El servidor retorna userId
+          final data    = response.data!;
+          final success = data['success'] == true;
+          final token   = data['token']?.toString();
+          final userId  = data['userId']?.toString(); // UUID string
 
-          print('Datos extraídos del login:');
-          print('  - success: $success');
-          print('  - token: ${token != null ? "${token.toString().substring(0, 10)}..." : "null"}');
-          print('  - userId: $userId (tipo: ${userId.runtimeType})');
-
-          if (success && token != null && userId != null) {
-            // Guardar token automáticamente
-            DatabaseService.setAuthToken(token);
-            print('Login exitoso en intento $attemptCount');
-            print('Token guardado: ${token.toString().substring(0, 20)}...');
-            print('ID de usuario: $userId');
-
-            // OBTENER NOMBRE DEL USUARIO DESPUÉS DEL LOGIN
-            String? userName;
-            try {
-              final userResponse = await DatabaseService.get<dynamic>(
-                '/users/$userId',
-                requiresAuth: true,
-              );
-
-              if (userResponse.success && userResponse.data != null) {
-                // Manejar diferentes estructuras de respuesta
-                Map<String, dynamic> userData = userResponse.data;
-                if (userData.containsKey('data')) {
-                  userData = userData['data'];
-                } else if (userData.containsKey('user')) {
-                  userData = userData['user'];
-                }
-                userName = userData['nombre']?.toString();
-                print('Nombre de usuario obtenido: $userName');
-              }
-            } catch (e) {
-              print('Error obteniendo datos del usuario: $e');
-              // Continuar sin el nombre
-            }
-
-            return AuthResponse.success(
-              token: token.toString(),
-              userId: userId is int ? userId : int.tryParse(userId.toString()),
-              nombre: userName, // Ahora obtenido del endpoint /users/:id
-              message: userName != null
-                  ? '¡Login exitoso! Bienvenido $userName'
-                  : '¡Login exitoso! Bienvenido',
-            );
-          } else {
-            print('Datos incompletos en respuesta exitosa:');
-            print('  - success: $success');
-            print('  - token: ${token != null ? "presente" : "ausente"}');
-            print('  - userId: ${userId != null ? "presente" : "ausente"}');
-
+          if (!success || token == null || userId == null) {
             return AuthResponse.failure(
-              error: 'Login falló - respuesta inválida del servidor',
-            );
-          }
-        } else {
-          // Manejar estructura de error de tu servidor: { error: { code, message } }
-          if (response.statusCode != null && response.statusCode! >= 400 && response.statusCode! < 500) {
-            print('Error del cliente (${response.statusCode})');
-            print('Datos de respuesta: ${response.data}'); // Debug adicional
-
-            // Intentar extraer el mensaje de error de tu estructura específica
-            String errorMessage = 'Error desconocido';
-
-            // Tu servidor usa la estructura { error: { code, message } }
-            try {
-              if (response.data != null) {
-                final data = response.data;
-
-                // Caso 1: { error: { message: "..." } }
-                if (data is Map<String, dynamic> && data['error'] != null) {
-                  final errorObj = data['error'];
-                  if (errorObj is Map<String, dynamic> && errorObj['message'] != null) {
-                    errorMessage = errorObj['message'];
-                  }
-                }
-                // Caso 2: { message: "..." } directamente
-                else if (data is Map<String, dynamic> && data['message'] != null) {
-                  errorMessage = data['message'];
-                }
-                // Caso 3: String directo
-                else if (data is String) {
-                  errorMessage = data as String;
-                }
-              }
-
-              // Fallback al error del DatabaseResponse
-              if (errorMessage == 'Error desconocido' && response.error != null) {
-                errorMessage = response.error!;
-              }
-            } catch (e) {
-              print('Error parseando mensaje: $e');
-              errorMessage = response.error ?? 'Error de formato en la respuesta';
-            }
-
-            print('Mensaje de error extraído: $errorMessage');
-
-            // Mensajes específicos según el código HTTP
-            switch (response.statusCode!) {
-              case 400:
-              // Tu servidor devuelve 400 para credenciales incorrectas
-                if (errorMessage.isEmpty || errorMessage.contains('HTTP 400')) {
-                  errorMessage = 'Email o contraseña incorrectos';
-                }
-                break;
-              case 401:
-                if (errorMessage.contains('token')) {
-                  errorMessage = 'Sesión expirada. Vuelve a iniciar sesión.';
-                } else if (errorMessage.isEmpty || errorMessage.contains('HTTP 401')) {
-                  errorMessage = 'Email o contraseña incorrectos';
-                }
-                break;
-              case 403:
-                if (errorMessage.isEmpty || errorMessage.contains('HTTP 403')) {
-                  errorMessage = 'Acceso denegado. Cuenta puede estar deshabilitada.';
-                }
-                break;
-              case 404:
-                if (errorMessage.isEmpty || errorMessage.contains('HTTP 404')) {
-                  errorMessage = 'Servicio de autenticación no encontrado';
-                }
-                break;
-              case 422:
-                if (errorMessage.isEmpty || errorMessage.contains('HTTP 422')) {
-                  errorMessage = 'Email o contraseña con formato inválido';
-                }
-                break;
-            }
-
-            return AuthResponse.failure(
-              error: errorMessage,
-              statusCode: response.statusCode,
-            );
+                error: 'Respuesta inválida del servidor');
           }
 
-          // Error de conexión, continuar con retry
-          print('Intento $attemptCount falló: ${response.error}');
-          if (attemptCount >= maxRetries) {
-            return AuthResponse.failure(
-              error: response.error ?? 'Error de conexión después de $maxRetries intentos',
-              statusCode: response.statusCode,
-            );
-          }
-        }
-      } catch (e) {
-        print('Error en intento $attemptCount: $e');
+          // Guardar token en memoria + SharedPreferences
+          await DatabaseService.setAuthToken(token);
 
-        // Si es el último intento, devolver error
-        if (attemptCount >= maxRetries) {
-          return AuthResponse.failure(
-            error: 'Error de conexión después de $maxRetries intentos: $e',
+          // 3. Obtener perfil del usuario para nombre, rol y rolId
+          String? nombre;
+          String? rolCodigo;
+          String? rolId;
+          try {
+            final userResp = await DatabaseService.get<dynamic>(
+              DatabaseEndpoints.usuarioById(userId),
+              requiresAuth: true,
+            );
+            if (userResp.success && userResp.data != null) {
+              final raw = userResp.data;
+              final Map<String, dynamic> ud =
+                  raw is Map<String, dynamic> ? raw : {};
+              nombre    = ud['nombre']?.toString();
+              rolCodigo = ud['rol_codigo']?.toString();
+              rolId     = ud['rol_id']?.toString();
+            }
+          } catch (e) {
+            print('[AuthService] No se pudo obtener perfil: $e');
+          }
+
+          print('[AuthService] Login OK → userId=$userId rol=$rolCodigo');
+
+          return AuthResponse.success(
+            token:     token,
+            userId:    userId,
+            rolId:     rolId,
+            nombre:    nombre,
+            rolCodigo: rolCodigo,
+            message:   nombre != null
+                ? '¡Bienvenido, $nombre!'
+                : '¡Login exitoso!',
           );
-        }
-
-        // Si no es el último intento, esperar un poco antes del retry
-        if (attemptCount < maxRetries) {
-          print('Esperando 1 segundo antes del retry...');
+        } else {
+          // Error 4xx → no reintentar
+          if (response.statusCode != null && response.statusCode! >= 400 &&
+              response.statusCode! < 500) {
+            return AuthResponse.failure(
+              error: response.error ?? 'Credenciales inválidas',
+              statusCode: response.statusCode,
+            );
+          }
+          // Error de red → reintentar
+          if (attempt >= maxRetries) {
+            return AuthResponse.failure(
+              error: response.error ??
+                  'Error de conexión después de $maxRetries intentos',
+            );
+          }
           await Future.delayed(const Duration(seconds: 1));
         }
+      } catch (e) {
+        print('[AuthService] Error en intento $attempt: $e');
+        if (attempt >= maxRetries) {
+          return AuthResponse.failure(
+              error: 'Error de conexión después de $maxRetries intentos: $e');
+        }
+        await Future.delayed(const Duration(seconds: 1));
       }
     }
 
-    // Fallback (no debería llegar aquí)
-    return AuthResponse.failure(
-      error: 'Error inesperado en el login',
-    );
+    return AuthResponse.failure(error: 'Error inesperado en el login');
   }
 
-  // LOGOUT - Limpiar sesión
-  static void logout() {
-    print('AuthService: Cerrando sesión');
-    DatabaseService.clearAuthToken();
+  // ── LOGOUT ────────────────────────────────────────────────────
+  static Future<void> logout() async {
+    print('[AuthService] Cerrando sesión');
+    await DatabaseService.clearAuthToken();
   }
 
-  // VERIFICAR SI HAY TOKEN
-  static bool isLoggedIn() {
-    return DatabaseService.hasAuthToken();
-  }
+  // ── ESTADO DE SESIÓN ──────────────────────────────────────────
+  static bool  isLoggedIn()     => DatabaseService.hasAuthToken();
+  static String? getCurrentToken() => DatabaseService.getAuthToken();
 
-  // OBTENER TOKEN ACTUAL
-  static String? getCurrentToken() {
-    return DatabaseService.getAuthToken();
-  }
-
+  // ── RECUPERACIÓN DE CONTRASEÑA ────────────────────────────────
   static Future<DatabaseResponse> forgotPassword({
     String? email,
-    String? telefono,
+    String? telefono, // mantenido por compatibilidad (el backend no lo usa aún)
   }) async {
-
-    return await DatabaseService.post(
+    return DatabaseService.post(
       DatabaseEndpoints.forgotPassword,
-      {
-        "email": email,
-        "telefono": telefono,
-      },
+      {'email': email},
     );
   }
 
@@ -251,15 +136,9 @@ class AuthService {
     required String token,
     required String newPassword,
   }) async {
-
-    return await DatabaseService.post(
+    return DatabaseService.post(
       DatabaseEndpoints.resetPassword,
-      {
-        "token": token,
-        "newPassword": newPassword,
-      },
+      {'token': token, 'newPassword': newPassword},
     );
   }
-
 }
-
