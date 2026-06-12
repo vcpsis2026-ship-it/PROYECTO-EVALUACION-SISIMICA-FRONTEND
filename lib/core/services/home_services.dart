@@ -52,7 +52,7 @@ class HomeService {
         attempts++;
 
         final response = await http.get(
-          Uri.parse('$_baseUrl/users/$userId'),
+          Uri.parse('$_baseUrl/usuarios/$userId'),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
@@ -171,7 +171,7 @@ class HomeService {
   }) async {
     try {
       final response = await http.get(
-        Uri.parse('$_baseUrl/users/$userId/statistics'),
+        Uri.parse('$_baseUrl/usuarios/$userId/statistics'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -185,7 +185,7 @@ class HomeService {
         // Si no existe el endpoint, retornar estadísticas por defecto
         return HomeResponse.success(
             HomeData(
-              userInfo: UserInfo(idUsuario: 0, nombre: '', email: '', rol: ''),
+              userInfo: UserInfo(idUsuario: '', nombre: '', email: '', rol: ''),
               statistics: HomeStatistics(
                 totalEdificios: 0,
                 edificiosEvaluados: 0,
@@ -200,7 +200,7 @@ class HomeService {
       // Retornar estadísticas vacías si falla
       return HomeResponse.success(
           HomeData(
-            userInfo: UserInfo(idUsuario: 0, nombre: '', email: '', rol: ''),
+            userInfo: UserInfo(idUsuario: '', nombre: '', email: '', rol: ''),
             statistics: HomeStatistics(
               totalEdificios: 0,
               edificiosEvaluados: 0,

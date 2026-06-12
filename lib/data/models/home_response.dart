@@ -71,7 +71,7 @@ class HomeData {
 }
 
 class UserInfo {
-  final int idUsuario;
+  final String idUsuario;
   final String nombre;
   final String email;
   final String rol;
@@ -84,21 +84,18 @@ class UserInfo {
   });
 
   factory UserInfo.fromJson(Map<String, dynamic> json) {
-    // ✅ CORREGIDO: Manejar tanto id_usuario como userId
-    int? userId;
-
-    // Intentar obtener el ID desde diferentes campos
+    String userId = '';
     if (json['id_usuario'] != null) {
-      userId = json['id_usuario'] is int ? json['id_usuario'] : int.tryParse(json['id_usuario'].toString());
+      userId = json['id_usuario'].toString();
     } else if (json['userId'] != null) {
-      userId = json['userId'] is int ? json['userId'] : int.tryParse(json['userId'].toString());
+      userId = json['userId'].toString();
     }
 
     return UserInfo(
-      idUsuario: userId ?? 0,
+      idUsuario: userId,
       nombre: json['nombre']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
-      rol: json['rol']?.toString() ?? '',
+      rol: json['rol']?.toString() ?? json['rol_codigo']?.toString() ?? '',
     );
   }
 

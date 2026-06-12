@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/auth_service.dart';
-import '../../core/services/database_service.dart';
+import '../../core/services/permisos_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/connection_test_android.dart';
@@ -45,48 +45,30 @@ class _LoginScreenState extends State<LoginScreen> {
       print('Respuesta de AuthService: ${authResponse.toDebugMap()}');
 
       if (authResponse.success) {
-        // LOGIN EXITOSO - AuthResponse ya contiene todo lo necesario
-        final token = authResponse.token!;
-        final userId = authResponse.userId!.toString();
-        final userName = authResponse.userNameValue; // Ya incluye fallback
+        // LOGIN EXITOSO — AuthService ya guardó el token y obtuvo perfil
+        final token    = authResponse.token!;
+        final userId   = authResponse.userId ?? '';
+        final userName = authResponse.userNameValue;
+        final userRole = authResponse.userRoleValue; // rolCodigo del backend
 
-        print('Datos del usuario obtenidos:');
-        print('  - userName: $userName');
-        print('  - userId: $userId');
-        print('  - token: ${token.substring(0, 10)}...');
+        print('[Login] userId=$userId rol=$userRole nombre=$userName');
 
-        // OBTENER ROL DEL USUARIO - Solo si es necesario
-        String userRole = 'user'; // Valor por defecto
-
-        // El AuthService ya configuró el token, podemos hacer llamadas autenticadas
-        if (authResponse.nombre != null) {
-          // Si AuthService obtuvo el nombre, también intentar obtener el rol
-          try {
-            final roleResponse = await _getUserRole(token, userId);
-            if (roleResponse != null) {
-              userRole = roleResponse;
-            }
-          } catch (e) {
-            print('Error obteniendo rol: $e');
-            // Continuar con rol por defecto
-          }
-        }
-
-        print('Rol final del usuario: $userRole');
-
-        // Guardar en SharedPreferences
+        // Persistir datos de sesión en SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('accessToken', token);
         await prefs.setString('userId', userId);
         await prefs.setString('userName', userName);
         await prefs.setString('userRole', userRole);
 
-        // Verificar que se guardaron correctamente
-        print('Datos guardados en SharedPreferences:');
-        print('  - accessToken: ${token.substring(0, 10)}...');
-        print('  - userId: $userId');
-        print('  - userName: $userName');
-        print('  - userRole: $userRole');
+        // Guardar rolId y cargar permisos del backend
+        final rolId = authResponse.rolId;
+        if (rolId != null && rolId.isNotEmpty) {
+          await PermisosService.saveRolId(rolId);
+          await PermisosService.fetchAndCache(rolId);
+          print('  - rolId guardado + permisos cacheados');
+        }
+
+        print('[Login] userId=$userId rolId=$rolId rol=$userRole');
 
         if (mounted) {
           // Mostrar mensaje de éxito
@@ -134,63 +116,22 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // Método auxiliar para obtener rol del usuario
-  Future<String?> _getUserRole(String token, String userId) async {
-    try {
-      // Usar DatabaseService directamente ya que el token está configurado
-      final response = await DatabaseService.get<dynamic>(
-        '/users/$userId',
-        requiresAuth: true,
-      );
-
-      if (response.success && response.data != null) {
-        Map<String, dynamic> userData = response.data;
-
-        // Manejar diferentes estructuras de respuesta
-        if (userData.containsKey('data')) {
-          userData = userData['data'];
-        } else if (userData.containsKey('user')) {
-          userData = userData['user'];
-        }
-
-        final rol = userData['rol']?.toString();
-        return rol?.isNotEmpty == true ? rol!.toLowerCase() : null;
-      }
-    } catch (e) {
-      print('Error obteniendo rol: $e');
-    }
-    return null;
-  }
-
-  // Método auxiliar para redirección
+  // Redirección según rolCodigo del backend
   void _redirectByRole(String userRole) {
-    print('Redirigiendo según el rol: $userRole');
-
+    print('[Login] Redirigiendo → rol=$userRole');
     switch (userRole.toLowerCase()) {
-      case 'admin':
-        print('Navegando a HomeAdminScreen...');
+      case 'administrador':
         Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/homeAdmin',
-              (route) => false,
-        );
+            context, '/homeAdmin', (route) => false);
         break;
       case 'inspector':
       case 'ayudante':
-        print('Navegando a HomePage (inspector/ayudante)...');
         Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/home',
-              (route) => false,
-        );
+            context, '/home', (route) => false);
         break;
       default:
-        print('Navegando a HomePage (usuario general)...');
         Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/home',
-              (route) => false,
-        );
+            context, '/home', (route) => false);
         break;
     }
   }

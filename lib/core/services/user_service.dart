@@ -3,102 +3,94 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
 import '../config/database_config.dart';
-import '../../data/models/database_response.dart';
-import '../../data/models/user_response.dart';
 import '../constants/database_endpoints.dart';
 import 'database_service.dart';
+import '../../data/models/database_response.dart';
+import '../../data/models/user_response.dart';
 
 class UserService {
-  /// Obtener usuario por ID - para ProfileAdminScreen
+  // ── Obtener usuario por ID ─────────────────────────────────────
   static Future<UserResponse> getUserById({
     required String token,
     required String userId,
+    int maxRetries = 2,             // mantenido por compatibilidad
+    Duration timeout = const Duration(seconds: 10), // mantenido por compatibilidad
+  }) async {
+    DatabaseService.setAuthToken(token);
+    try {
+      final response = await DatabaseService.get<dynamic>(
+        DatabaseEndpoints.usuarioById(userId),
+        requiresAuth: true,
+      );
+      if (response.success && response.data != null) {
+        final map = _toMap(response.data);
+        if (map != null) return UserResponse.success(UserData.fromJson(map));
+        return UserResponse.error('Estructura de respuesta inválida');
+      }
+      return UserResponse.error(_errorMsg(response));
+    } catch (e) {
+      return UserResponse.error('Error inesperado: $e');
+    }
+  }
+
+  // ── Obtener todos los usuarios ────────────────────────────────
+  static Future<UsersListResponse> getAllUsers({
+    required String token,
     int maxRetries = 2,
     Duration timeout = const Duration(seconds: 10),
   }) async {
-    int attempts = 0;
-
-    while (attempts < maxRetries) {
-      try {
-        attempts++;
-
-        // Establecer el token de autenticación
-        DatabaseService.setAuthToken(token);
-
-        // Usar DatabaseService para hacer la petición
-        final response = await DatabaseService.get<dynamic>(
-          '${DatabaseEndpoints.user}/$userId',
-          requiresAuth: true,
+    DatabaseService.setAuthToken(token);
+    try {
+      final response = await DatabaseService.get<dynamic>(
+        DatabaseEndpoints.usuarios,
+        requiresAuth: true,
+      );
+      if (response.success && response.data != null) {
+        return UsersListResponse(
+          success: true,
+          message: 'OK',
+          data: _toList(response.data)
+              .map((e) => UserData.fromJson(e as Map<String, dynamic>))
+              .toList(),
         );
-
-        print('UserService.getUserById - Attempt: $attempts, Success: ${response.success}');
-
-        if (response.success && response.data != null) {
-          // Manejo seguro de tipos de respuesta
-          Map<String, dynamic>? userData;
-
-          try {
-            if (response.data is String) {
-              // Si es String, intentar parsearlo como JSON
-              final parsedData = json.decode(response.data as String);
-              if (parsedData is Map<String, dynamic>) {
-                userData = _extractUserData(parsedData);
-              }
-            } else if (response.data is Map<String, dynamic>) {
-              // Manejo normal para Map
-              userData = _extractUserData(response.data as Map<String, dynamic>);
-            }
-          } catch (parseError) {
-            print('Error parsing user data: $parseError');
-            if (attempts >= maxRetries) {
-              return UserResponse.error('Error procesando datos del usuario: $parseError');
-            }
-            if (attempts < maxRetries) {
-              await Future.delayed(Duration(seconds: attempts));
-              continue;
-            }
-          }
-
-          if (userData != null) {
-            return UserResponse.success(
-              UserData.fromJson(userData),
-              message: 'Usuario obtenido correctamente',
-            );
-          } else {
-            if (attempts >= maxRetries) {
-              return UserResponse.error('Estructura de respuesta inválida');
-            }
-          }
-        } else {
-          // Si es un error de cliente (4xx), no reintentar
-          if (response.statusCode != null && response.statusCode! >= 400 && response.statusCode! < 500) {
-            return UserResponse.error(_getErrorMessage(response));
-          }
-
-          // Para otros errores, reintentar
-          if (attempts >= maxRetries) {
-            return UserResponse.error(_getErrorMessage(response));
-          }
-        }
-
-        // Esperar antes del siguiente intento
-        if (attempts < maxRetries) {
-          await Future.delayed(Duration(seconds: attempts));
-        }
-
-      } catch (e) {
-        print('Error en getUserById attempt $attempts: $e');
-        if (attempts >= maxRetries) {
-          return UserResponse.error('Error inesperado: $e');
-        }
-        await Future.delayed(Duration(seconds: attempts));
       }
+      return UsersListResponse.error(_errorMsg(response));
+    } catch (e) {
+      return UsersListResponse.error('Error inesperado: $e');
     }
-
-    return UserResponse.error('Error después de $maxRetries intentos');
   }
 
-  // MÉTODO ACTUALIZADO EN UserService para updateUser
+  // ── Obtener usuarios por rol ───────────────────────────────────
+  /// [rolCodigo] = 'administrador' | 'inspector' | 'ayudante'
+  static Future<UsersListResponse> getUsersByRole({
+    required String token,
+    required String rolCodigo,
+    int maxRetries = 2,
+    Duration timeout = const Duration(seconds: 10),
+    String? role, // alias legacy — se ignora si se usa rolCodigo
+  }) async {
+    DatabaseService.setAuthToken(token);
+    try {
+      final response = await DatabaseService.get<dynamic>(
+        DatabaseEndpoints.usuariosByRolCodigo(rolCodigo),
+        requiresAuth: true,
+      );
+      if (response.success && response.data != null) {
+        return UsersListResponse(
+          success: true,
+          message: 'OK',
+          data: _toList(response.data)
+              .map((e) => UserData.fromJson(e as Map<String, dynamic>))
+              .toList(),
+        );
+      }
+      return UsersListResponse.error(_errorMsg(response));
+    } catch (e) {
+      return UsersListResponse.error('Error inesperado: $e');
+    }
+  }
+
+  // ── Actualizar usuario (multipart para foto, JSON sin foto) ────
   static Future<UserResponse> updateUser({
     required String token,
     required String userId,
@@ -109,508 +101,83 @@ class UserService {
     String? direccion,
     String? currentPassword,
     String? newPassword,
-    File? imageFile,
-    bool removeImage = false, // NUEVO: Flag para indicar eliminación de imagen
-    int maxRetries = 2,
-    Duration timeout = const Duration(seconds: 15),
+    File?   imageFile,
+    bool    removeImage = false, // mantenido por compatibilidad
+    int     maxRetries  = 2,
+    Duration timeout    = const Duration(seconds: 15),
   }) async {
-    int attempts = 0;
+    DatabaseService.setAuthToken(token);
 
-    while (attempts < maxRetries) {
-      try {
-        attempts++;
+    final fields = <String, String>{};
+    if (nombre          != null && nombre.isNotEmpty)          fields['nombre']          = nombre;
+    if (telefono        != null && telefono.isNotEmpty)        fields['telefono']        = telefono;
+    if (email           != null && email.isNotEmpty)           fields['email']           = email;
+    if (cedula          != null && cedula.isNotEmpty)          fields['cedula']          = cedula;
+    if (direccion       != null && direccion.isNotEmpty)       fields['direccion']       = direccion;
+    if (currentPassword != null && currentPassword.isNotEmpty) fields['currentPassword'] = currentPassword;
+    if (newPassword     != null && newPassword.isNotEmpty)     fields['password']        = newPassword;
 
-        // Establecer el token de autenticación
-        DatabaseService.setAuthToken(token);
-
-        // Preparar campos para la actualización
-        Map<String, String> fields = {};
-
-        if (nombre != null && nombre.trim().isNotEmpty) {
-          fields['nombre'] = nombre.trim();
-        }
-        if (telefono != null && telefono.trim().isNotEmpty) {
-          fields['telefono'] = telefono.trim();
-        }
-        if (email != null && email.trim().isNotEmpty) {
-          fields['email'] = email.trim();
-        }
-        if (cedula != null && cedula.trim().isNotEmpty) {
-          fields['cedula'] = cedula.trim();
-        }
-        if (direccion != null && direccion.trim().isNotEmpty) {
-          fields['direccion'] = direccion.trim();
-        }
-        if (currentPassword != null && currentPassword.trim().isNotEmpty) {
-          fields['currentPassword'] = currentPassword.trim();
-        }
-        if (newPassword != null && newPassword.trim().isNotEmpty) {
-          fields['password'] = newPassword.trim();
-        }
-
-        // NUEVO: Manejar eliminación de imagen
-        if (removeImage) {
-          fields['remove_image'] = 'true';
-        }
-
-        print('UserService.updateUser - Attempt: $attempts');
-        print('Fields: ${fields.keys.toList()}');
-        print('Has image file: ${imageFile != null}');
-        print('Remove image: $removeImage');
-
-        DatabaseResponse<Map<String, dynamic>> response;
-
-        // LÓGICA MEJORADA PARA DECIDIR EL MÉTODO
-        if (imageFile != null || removeImage) {
-          // Si hay archivo o se quiere eliminar imagen, usar multipart
-          response = await _updateUserWithFile(userId, fields, imageFile);
-        } else {
-          // Sin cambios de imagen, usar JSON normal (más eficiente)
-          response = await _updateUserWithoutFile(userId, fields);
-        }
-
-        if (response.success && response.data != null) {
-          // Extraer datos del usuario de la respuesta
-          final userData = _extractUserData(response.data!);
-          if (userData != null) {
-            return UserResponse.success(
-              UserData.fromJson(userData),
-              message: 'Usuario actualizado correctamente',
-            );
-          } else {
-            return UserResponse.error('Respuesta inválida del servidor');
-          }
-        } else {
-          // Si es un error de cliente (4xx), no reintentar
-          if (response.statusCode != null && response.statusCode! >= 400 && response.statusCode! < 500) {
-            return UserResponse.error(_getErrorMessage(response));
-          }
-
-          // Para otros errores, reintentar
-          if (attempts >= maxRetries) {
-            return UserResponse.error(_getErrorMessage(response));
-          }
-        }
-
-        // Esperar antes del siguiente intento
-        if (attempts < maxRetries) {
-          await Future.delayed(Duration(seconds: attempts));
-        }
-
-      } catch (e) {
-        print('Error en updateUser attempt $attempts: $e');
-        if (attempts >= maxRetries) {
-          return UserResponse.error('Error inesperado: $e');
-        }
-        await Future.delayed(Duration(seconds: attempts));
-      }
-    }
-
-    return UserResponse.error('Error después de $maxRetries intentos');
-  }
-
-  /// MÉTODO ACTUALIZADO para envío con archivo
-  static Future<DatabaseResponse<Map<String, dynamic>>> _updateUserWithFile(
-      String userId,
-      Map<String, String> fields,
-      File? imageFile,
-      ) async {
     try {
-      // Crear request multipart manual para mayor control
-      final uri = Uri.parse('${DatabaseService.baseUrl}${DatabaseEndpoints.user}/$userId');
-      final request = http.MultipartRequest('PUT', uri);
+      DatabaseResponse<Map<String, dynamic>> response;
 
-      // Agregar headers de autenticación
-      if (DatabaseService.hasAuthToken()) {
-        request.headers['Authorization'] = 'Bearer ${DatabaseService.getAuthToken()}';
-      }
-
-      // Agregar campos
-      request.fields.addAll(fields);
-
-      // Agregar archivo si existe
       if (imageFile != null) {
-        // Validar archivo antes de enviarlo
-        if (!await imageFile.exists()) {
-          return DatabaseResponse.error('El archivo de imagen no existe');
-        }
-
-        // Validar tamaño (máximo 5MB)
-        final fileSize = await imageFile.length();
-        if (fileSize > 5 * 1024 * 1024) {
-          return DatabaseResponse.error('La imagen es demasiado grande (máximo 5MB)');
-        }
-
-        // Validar tipo de archivo
-        final extension = imageFile.path.toLowerCase();
-        if (!extension.endsWith('.jpg') &&
-            !extension.endsWith('.jpeg') &&
-            !extension.endsWith('.png')) {
-          return DatabaseResponse.error('Formato de imagen no válido. Use JPG o PNG');
-        }
-
-        try {
-          // Crear MultipartFile con el nombre correcto que espera el servidor
-          request.files.add(await http.MultipartFile.fromPath(
-            'foto_perfil', // Nombre del campo que espera el servidor
-            imageFile.path,
-            contentType: MediaType('image', extension.endsWith('.png') ? 'png' : 'jpeg'),
-          ));
-
-          print('Archivo agregado: ${imageFile.path}');
-          print('Tamaño: ${fileSize} bytes');
-        } catch (e) {
-          return DatabaseResponse.error('Error procesando archivo de imagen: $e');
-        }
-      }
-
-      print('=== UPDATE USER REQUEST ===');
-      print('URL: ${request.url}');
-      print('Fields: ${request.fields}');
-      print('Files: ${request.files.length}');
-      print('========================');
-
-      // Enviar request
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        try {
-          final jsonData = json.decode(response.body);
-          return DatabaseResponse.success(
-            jsonData as Map<String, dynamic>,
-            statusCode: response.statusCode,
-          );
-        } catch (e) {
-          return DatabaseResponse.error('Error parsing response: $e');
-        }
+        response = await _putMultipart(userId, fields, imageFile);
       } else {
-        String errorMessage = 'Error del servidor';
-        try {
-          final errorData = json.decode(response.body);
-          if (errorData is Map<String, dynamic>) {
-            errorMessage = errorData['error']?.toString() ??
-                errorData['message']?.toString() ??
-                'Error del servidor';
-          }
-        } catch (e) {
-          errorMessage = response.body.isNotEmpty ? response.body : 'Error desconocido';
-        }
-
-        return DatabaseResponse.error(
-          errorMessage,
+        response = await DatabaseService.put<Map<String, dynamic>>(
+          DatabaseEndpoints.usuarioById(userId),
+          fields.map((k, v) => MapEntry(k, v as dynamic)),
+          requiresAuth: true,
         );
       }
+
+      if (response.success && response.data != null) {
+        final map = _toMap(response.data!);
+        if (map != null) {
+          return UserResponse.success(UserData.fromJson(map),
+              message: 'Usuario actualizado');
+        }
+        return UserResponse.error('Respuesta inválida');
+      }
+      return UserResponse.error(_errorMsg(response));
     } catch (e) {
-      return DatabaseResponse.error('Error de conexión: $e');
+      return UserResponse.error('Error inesperado: $e');
     }
   }
-  /// Obtener lista de usuarios sin rol - para UserListScreen
-  static Future<UsersListResponse> getUsersWithoutRole({
-    required String token,
-    int maxRetries = 2,
-    Duration timeout = const Duration(seconds: 10),
-  }) async {
-    int attempts = 0;
 
-    while (attempts < maxRetries) {
-      try {
-        attempts++;
-
-        // Establecer el token de autenticación
-        DatabaseService.setAuthToken(token);
-
-        // Usar el endpoint general /users
-        final response = await DatabaseService.get<dynamic>(
-          DatabaseEndpoints.user,
-          requiresAuth: true,
-        );
-
-        print('UserService.getUsersWithoutRole - Attempt: $attempts, Success: ${response.success}');
-
-        if (response.success && response.data != null) {
-          List<dynamic> usersData = [];
-
-          // Manejo seguro de tipos de respuesta
-          try {
-            usersData = _extractUsersArray(response.data);
-          } catch (parseError) {
-            print('Error parsing response data: $parseError');
-            if (attempts >= maxRetries) {
-              return UsersListResponse.error('Error procesando respuesta del servidor: $parseError');
-            }
-            if (attempts < maxRetries) {
-              await Future.delayed(Duration(seconds: attempts));
-              continue;
-            }
-          }
-
-          // Convertir a lista de UserData y filtrar usuarios sin rol
-          final users = usersData
-              .map((userData) => UserData.fromJson(userData as Map<String, dynamic>))
-              .where((user) => !user.hasValidRole) // Solo usuarios sin rol válido
-              .toList();
-
-          return UsersListResponse.success(
-            users,
-            message: 'Lista de usuarios sin rol obtenida correctamente',
-          );
-        } else {
-          // Si es un error de cliente (4xx), no reintentar
-          if (response.statusCode != null && response.statusCode! >= 400 && response.statusCode! < 500) {
-            return UsersListResponse.error(_getErrorMessage(response));
-          }
-
-          // Para otros errores, reintentar
-          if (attempts >= maxRetries) {
-            return UsersListResponse.error(_getErrorMessage(response));
-          }
-        }
-
-        // Esperar antes del siguiente intento
-        if (attempts < maxRetries) {
-          await Future.delayed(Duration(seconds: attempts));
-        }
-
-      } catch (e) {
-        print('Error en getUsersWithoutRole attempt $attempts: $e');
-        if (attempts >= maxRetries) {
-          return UsersListResponse.error('Error inesperado: $e');
-        }
-        await Future.delayed(Duration(seconds: attempts));
-      }
-    }
-
-    return UsersListResponse.error('Error después de $maxRetries intentos');
-  }
-
-  /// Obtener lista de TODOS los usuarios - para gestión de roles
-  static Future<UsersListResponse> getAllUsers({
-    required String token,
-    int maxRetries = 2,
-    Duration timeout = const Duration(seconds: 10),
-  }) async {
-    int attempts = 0;
-
-    while (attempts < maxRetries) {
-      try {
-        attempts++;
-
-        // Establecer el token de autenticación
-        DatabaseService.setAuthToken(token);
-
-        // Usar el endpoint general /users
-        final response = await DatabaseService.get<dynamic>(
-          DatabaseEndpoints.user,
-          requiresAuth: true,
-        );
-
-        print('UserService.getAllUsers - Attempt: $attempts, Success: ${response.success}');
-
-        if (response.success && response.data != null) {
-          List<dynamic> usersData = [];
-
-          // Manejo seguro de tipos de respuesta
-          try {
-            usersData = _extractUsersArray(response.data);
-          } catch (parseError) {
-            print('Error parsing response data: $parseError');
-            if (attempts >= maxRetries) {
-              return UsersListResponse.error('Error procesando respuesta del servidor: $parseError');
-            }
-            if (attempts < maxRetries) {
-              await Future.delayed(Duration(seconds: attempts));
-              continue;
-            }
-          }
-
-          // Convertir a lista de UserData - SIN filtrar por rol (excepto admins si es necesario)
-          final users = usersData
-              .map((userData) => UserData.fromJson(userData as Map<String, dynamic>))
-              .where((user) => user.rol.toLowerCase() != 'admin') // Opcional: excluir admins
-              .toList();
-
-          return UsersListResponse.success(
-            users,
-            message: 'Lista completa de usuarios obtenida correctamente',
-          );
-        } else {
-          // Si es un error de cliente (4xx), no reintentar
-          if (response.statusCode != null && response.statusCode! >= 400 && response.statusCode! < 500) {
-            return UsersListResponse.error(_getErrorMessage(response));
-          }
-
-          // Para otros errores, reintentar
-          if (attempts >= maxRetries) {
-            return UsersListResponse.error(_getErrorMessage(response));
-          }
-        }
-
-        // Esperar antes del siguiente intento
-        if (attempts < maxRetries) {
-          await Future.delayed(Duration(seconds: attempts));
-        }
-
-      } catch (e) {
-        print('Error en getAllUsers attempt $attempts: $e');
-        if (attempts >= maxRetries) {
-          return UsersListResponse.error('Error inesperado: $e');
-        }
-        await Future.delayed(Duration(seconds: attempts));
-      }
-    }
-
-    return UsersListResponse.error('Error después de $maxRetries intentos');
-  }
-
-  /// Obtener usuarios por rol específico - método adicional
-  static Future<UsersListResponse> getUsersByRole({
-    required String token,
-    required String role,
-    int maxRetries = 2,
-    Duration timeout = const Duration(seconds: 10),
-  }) async {
-    int attempts = 0;
-
-    while (attempts < maxRetries) {
-      try {
-        attempts++;
-
-        // Establecer el token de autenticación
-        DatabaseService.setAuthToken(token);
-
-        // Usar el endpoint byRole específico
-        final response = await DatabaseService.get<dynamic>(
-          '${DatabaseEndpoints.user}/byRole/$role',
-          requiresAuth: true,
-        );
-
-        print('UserService.getUsersByRole - Attempt: $attempts, Role: $role, Success: ${response.success}');
-
-        if (response.success && response.data != null) {
-          List<dynamic> usersData = [];
-
-          // Manejo seguro de tipos de respuesta
-          try {
-            usersData = _extractUsersArray(response.data);
-          } catch (parseError) {
-            print('Error parsing response data: $parseError');
-            if (attempts >= maxRetries) {
-              return UsersListResponse.error('Error procesando respuesta del servidor: $parseError');
-            }
-            if (attempts < maxRetries) {
-              await Future.delayed(Duration(seconds: attempts));
-              continue;
-            }
-          }
-
-          // Convertir a lista de UserData
-          final users = usersData
-              .map((userData) => UserData.fromJson(userData as Map<String, dynamic>))
-              .toList();
-
-          return UsersListResponse.success(
-            users,
-            message: 'Lista de usuarios con rol $role obtenida correctamente',
-          );
-        } else {
-          // Si es un error de cliente (4xx), no reintentar
-          if (response.statusCode != null && response.statusCode! >= 400 && response.statusCode! < 500) {
-            return UsersListResponse.error(_getErrorMessage(response));
-          }
-
-          // Para otros errores, reintentar
-          if (attempts >= maxRetries) {
-            return UsersListResponse.error(_getErrorMessage(response));
-          }
-        }
-
-        // Esperar antes del siguiente intento
-        if (attempts < maxRetries) {
-          await Future.delayed(Duration(seconds: attempts));
-        }
-
-      } catch (e) {
-        print('Error en getUsersByRole attempt $attempts: $e');
-        if (attempts >= maxRetries) {
-          return UsersListResponse.error('Error inesperado: $e');
-        }
-        await Future.delayed(Duration(seconds: attempts));
-      }
-    }
-
-    return UsersListResponse.error('Error después de $maxRetries intentos');
-  }
-
-  /// Asignar rol a usuario - para AssignRoleScreen
+  /// Alias de compatibilidad para pantallas que llaman assignRole(role:...)
   static Future<UserResponse> assignRole({
     required String token,
     required String userId,
     required String role,
     int maxRetries = 2,
     Duration timeout = const Duration(seconds: 10),
+  }) => changeRole(token: token, userId: userId, rolCodigo: role);
+
+  // ── Cambiar rol de usuario (solo admin) ───────────────────────
+  static Future<UserResponse> changeRole({
+    required String token,
+    required String userId,
+    required String rolCodigo,
   }) async {
-    int attempts = 0;
-
-    while (attempts < maxRetries) {
-      try {
-        attempts++;
-
-        // Establecer el token de autenticación
-        DatabaseService.setAuthToken(token);
-
-        // Usar PATCH para asignar rol
-        final response = await DatabaseService.patch<Map<String, dynamic>>(
-          '${DatabaseEndpoints.user}/$userId/role',
-          {'rol': role},
-          requiresAuth: true,
-        );
-
-        print('UserService.assignRole - Attempt: $attempts, Success: ${response.success}');
-
-        if (response.success && response.data != null) {
-          final userData = _extractUserData(response.data!);
-          if (userData != null) {
-            return UserResponse.success(
-              UserData.fromJson(userData),
-              message: 'Rol asignado correctamente',
-            );
-          } else {
-            return UserResponse.error('Respuesta inválida del servidor');
-          }
-        } else {
-          // Si es un error de cliente (4xx), no reintentar
-          if (response.statusCode != null && response.statusCode! >= 400 && response.statusCode! < 500) {
-            return UserResponse.error(_getErrorMessage(response));
-          }
-
-          // Para otros errores, reintentar
-          if (attempts >= maxRetries) {
-            return UserResponse.error(_getErrorMessage(response));
-          }
-        }
-
-        // Esperar antes del siguiente intento
-        if (attempts < maxRetries) {
-          await Future.delayed(Duration(seconds: attempts));
-        }
-
-      } catch (e) {
-        print('Error en assignRole attempt $attempts: $e');
-        if (attempts >= maxRetries) {
-          return UserResponse.error('Error inesperado: $e');
-        }
-        await Future.delayed(Duration(seconds: attempts));
+    DatabaseService.setAuthToken(token);
+    try {
+      final response = await DatabaseService.patch<Map<String, dynamic>>(
+        DatabaseEndpoints.usuarioRol(userId),
+        {'rol': rolCodigo},
+        requiresAuth: true,
+      );
+      if (response.success && response.data != null) {
+        final map = _toMap(response.data!);
+        if (map != null) return UserResponse.success(UserData.fromJson(map));
+        return UserResponse.error('Respuesta inválida');
       }
+      return UserResponse.error(_errorMsg(response));
+    } catch (e) {
+      return UserResponse.error('Error inesperado: $e');
     }
-
-    return UserResponse.error('Error después de $maxRetries intentos');
   }
 
-  /// Método helper para validar datos antes de enviarlos
+  // ── Validaciones ──────────────────────────────────────────────
   static String? validateUserData({
     String? nombre,
     String? telefono,
@@ -618,164 +185,110 @@ class UserService {
     String? cedula,
   }) {
     if (nombre != null && nombre.trim().isNotEmpty) {
-      if (nombre.trim().length < 2) {
-        return 'El nombre debe tener al menos 2 caracteres';
-      }
-      if (nombre.trim().length > 100) {
-        return 'El nombre no debe exceder 100 caracteres';
-      }
-      if (!RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$').hasMatch(nombre.trim())) {
-        return 'El nombre solo puede contener letras y espacios';
-      }
+      if (nombre.trim().length < 2) return 'El nombre debe tener al menos 2 caracteres';
+      if (nombre.trim().length > 100) return 'El nombre no debe exceder 100 caracteres';
     }
-
     if (telefono != null && telefono.trim().isNotEmpty) {
-      // Validación formato E.164 para Ecuador (+593XXXXXXXXX)
-      final phoneRegex = RegExp(r'^\+593[0-9]{9}$');
-      if (!phoneRegex.hasMatch(telefono.trim())) {
-        return 'Formato de teléfono inválido. Use +593XXXXXXXXX';
+      if (!RegExp(r'^\+593[0-9]{9}$').hasMatch(telefono.trim())) {
+        return 'Formato de teléfono inválido (+593XXXXXXXXX)';
       }
     }
-
     if (email != null && email.trim().isNotEmpty) {
-      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-      if (!emailRegex.hasMatch(email.trim())) {
+      if (!RegExp(r'^[\w\-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email.trim())) {
         return 'Formato de email inválido';
       }
     }
-
     if (cedula != null && cedula.trim().isNotEmpty) {
-      final cedulaRegex = RegExp(r'^\d{10}$');
-      if (!cedulaRegex.hasMatch(cedula.trim())) {
+      if (!RegExp(r'^\d{10}$').hasMatch(cedula.trim())) {
         return 'La cédula debe tener 10 dígitos';
-      }
-    }
-
-    return null; // Sin errores
-  }
-
-  /// Método helper para validar contraseñas
-  static String? validatePassword(String? password) {
-    if (password == null || password.trim().isEmpty) {
-      return null; // Opcional
-    }
-
-    if (password.trim().length < 6) {
-      return 'La contraseña debe tener al menos 6 caracteres';
-    }
-
-    if (!RegExp(r'[A-Z]').hasMatch(password)) {
-      return 'La contraseña debe tener al menos una letra mayúscula';
-    }
-
-    if (!RegExp(r'[0-9]').hasMatch(password)) {
-      return 'La contraseña debe tener al menos un número';
-    }
-
-    return null; // Sin errores
-  }
-
-  // MÉTODOS PRIVADOS AUXILIARES
-
-  /// Extraer datos de usuario de diferentes estructuras de respuesta
-  static Map<String, dynamic>? _extractUserData(Map<String, dynamic> responseData) {
-    // El servidor puede retornar:
-    // - { user: {userData} }
-    // - { data: {userData} }
-    // - {userData} directamente
-    if (responseData.containsKey('user')) {
-      return responseData['user'] as Map<String, dynamic>;
-    } else if (responseData.containsKey('data')) {
-      return responseData['data'] as Map<String, dynamic>;
-    } else {
-      // Verificar si contiene campos de usuario directamente
-      if (responseData.containsKey('id_usuario') || responseData.containsKey('nombre') || responseData.containsKey('email')) {
-        return responseData;
       }
     }
     return null;
   }
 
-  /// Extraer array de usuarios de diferentes estructuras de respuesta
-  static List<dynamic> _extractUsersArray(dynamic responseData) {
-    if (responseData is String) {
-      final parsedData = json.decode(responseData as String);
-      return _extractUsersArray(parsedData);
-    } else if (responseData is List<dynamic>) {
-      return responseData;
-    } else if (responseData is Map<String, dynamic>) {
-      if (responseData.containsKey('users')) {
-        return responseData['users'] as List<dynamic>;
-      } else if (responseData.containsKey('data')) {
-        final data = responseData['data'];
-        if (data is List<dynamic>) {
-          return data;
-        } else if (data is Map<String, dynamic> && data.containsKey('users')) {
-          return data['users'] as List<dynamic>;
-        }
-      }
-    }
+  static String? validatePassword(String? password) {
+    if (password == null || password.trim().isEmpty) return null;
+    if (password.length < 6) return 'Mínimo 6 caracteres';
+    if (!RegExp(r'[A-Z]').hasMatch(password)) return 'Debe tener una mayúscula';
+    if (!RegExp(r'[0-9]').hasMatch(password)) return 'Debe tener un número';
+    return null;
+  }
 
-    // Si no se puede extraer, retornar lista vacía
+  // ── Privados ──────────────────────────────────────────────────
+  static Future<DatabaseResponse<Map<String, dynamic>>> _putMultipart(
+    String userId,
+    Map<String, String> fields,
+    File imageFile,
+  ) async {
+    try {
+      final uri = Uri.parse(
+          '${DatabaseConfig.baseUrl}${DatabaseEndpoints.usuarioById(userId)}');
+      final request = http.MultipartRequest('PUT', uri);
+      if (DatabaseService.hasAuthToken()) {
+        request.headers['Authorization'] =
+            'Bearer ${DatabaseService.getAuthToken()}';
+      }
+      request.fields.addAll(fields);
+
+      final ext = imageFile.path.toLowerCase();
+      final mime = ext.endsWith('.png')
+          ? MediaType('image', 'png')
+          : MediaType('image', 'jpeg');
+      request.files.add(
+          await http.MultipartFile.fromPath('foto_perfil', imageFile.path,
+              contentType: mime));
+
+      final streamed = await request.send();
+      final response = await http.Response.fromStream(streamed);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return DatabaseResponse.success(
+            json.decode(response.body) as Map<String, dynamic>,
+            statusCode: response.statusCode);
+      }
+      final err = json.decode(response.body);
+      return DatabaseResponse.error(
+          err?['error']?['message'] ?? 'Error del servidor');
+    } catch (e) {
+      return DatabaseResponse.error('Error de conexión: $e');
+    }
+  }
+
+  static Map<String, dynamic>? _toMap(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      if (data.containsKey('id_usuario') ||
+          data.containsKey('nombre') ||
+          data.containsKey('email')) return data;
+      if (data['data'] is Map<String, dynamic>) return data['data'];
+      if (data['user'] is Map<String, dynamic>) return data['user'];
+    }
+    return null;
+  }
+
+  static List<dynamic> _toList(dynamic data) {
+    if (data is List) return data;
+    if (data is Map<String, dynamic>) {
+      if (data['data'] is List) return data['data'];
+      if (data['users'] is List) return data['users'];
+    }
     return [];
   }
 
-  /// Actualizar usuario sin archivo usando PUT
-  static Future<DatabaseResponse<Map<String, dynamic>>> _updateUserWithoutFile(
-      String userId,
-      Map<String, String> fields,
-      ) async {
-    try {
-      // Convertir a Map<String, dynamic>
-      final data = fields.map((key, value) => MapEntry(key, value as dynamic));
-
-      return await DatabaseService.put<Map<String, dynamic>>(
-        '${DatabaseEndpoints.user}/$userId',
-        data,
-        requiresAuth: true,
-      );
-    } catch (e) {
-      return DatabaseResponse.error('Error de conexión PUT: $e');
+  static String _errorMsg(DatabaseResponse r) {
+    if (r.statusCode == 404) return 'Recurso no encontrado';
+    if (r.statusCode == 401) return 'Token expirado o inválido';
+    if (r.statusCode == 403) return 'Acceso denegado';
+    if (r.statusCode == 400) return r.error ?? 'Datos inválidos';
+    if (r.statusCode != null && r.statusCode! >= 500) {
+      return 'Error interno del servidor';
     }
+    return r.error ?? 'Error desconocido';
   }
 
-  /// Helper para mensajes de error consistentes
-  static String _getErrorMessage(DatabaseResponse response) {
-    if (response.statusCode == 404) {
-      return 'Recurso no encontrado';
-    } else if (response.statusCode == 401) {
-      return 'Token de autenticación inválido o expirado';
-    } else if (response.statusCode == 403) {
-      return 'Acceso denegado. Permisos insuficientes';
-    } else if (response.statusCode == 400) {
-      return response.error ?? 'Datos de entrada inválidos';
-    } else if (response.statusCode == 422) {
-      return response.error ?? 'Error de validación de datos';
-    } else if (response.statusCode != null && response.statusCode! >= 500) {
-      return 'Error interno del servidor. Intente nuevamente';
-    } else {
-      return response.error ?? 'Error desconocido de conexión';
-    }
-  }
-
-  /// Verificar si hay conexión con el servidor
+  static void clearAuthToken()  => DatabaseService.clearAuthToken();
+  static bool hasAuthToken()    => DatabaseService.hasAuthToken();
   static Future<bool> checkServerConnection() async {
-    try {
-      final connectionResponse = await DatabaseService.checkConnection();
-      return connectionResponse.success;
-    } catch (e) {
-      print('Error verificando conexión: $e');
-      return false;
-    }
-  }
-
-  /// Limpiar token de autenticación
-  static void clearAuthToken() {
-    DatabaseService.clearAuthToken();
-  }
-
-  /// Verificar si hay token de autenticación
-  static bool hasAuthToken() {
-    return DatabaseService.hasAuthToken();
+    final r = await DatabaseService.checkConnection();
+    return r.success;
   }
 }

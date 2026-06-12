@@ -161,7 +161,7 @@ class UserData {
       email: json['email']?.toString() ?? '',
       cedula: json['cedula']?.toString(),
       telefono: json['telefono']?.toString() ?? json['phone']?.toString(),
-      rol: json['rol']?.toString() ?? json['role']?.toString() ?? '',
+      rol: json['rol']?.toString() ?? json['rol_codigo']?.toString() ?? json['role']?.toString() ?? '',
       direccion: json['direccion']?.toString() ?? json['address']?.toString(),
       fotoPerfilUrl: fotoUrl,
     );
@@ -260,6 +260,7 @@ class UserData {
   String get roleDisplayName {
     switch (rol.toLowerCase()) {
       case 'admin':
+      case 'administrador':
         return 'Administrador';
       case 'inspector':
         return 'Inspector';
@@ -270,9 +271,8 @@ class UserData {
     }
   }
 
-  // Método para verificar si es un rol válido
   bool get hasValidRole {
-    const validRoles = ['admin', 'inspector', 'ayudante'];
+    const validRoles = ['admin', 'administrador', 'inspector', 'ayudante'];
     return validRoles.contains(rol.toLowerCase());
   }
 

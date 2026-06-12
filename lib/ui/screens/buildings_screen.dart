@@ -3,10 +3,11 @@ import 'package:flutter_application_1/ui/screens/profile_page.dart';
 import 'home_page.dart';
 import '../../core/theme/app_colors.dart';
 import '../../ui/screens/building_registry_1_screen.dart';
-// NUEVOS IMPORTS - Reemplazar Supabase
 import '../../core/services/building_list_service.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/permisos_service.dart';
 import '../../data/models/building_list_response.dart';
+import '../../data/models/permiso_model.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
@@ -15,7 +16,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'profile_admin_screen.dart'; // Asegúrate de que la ruta sea correcta
+import 'profile_admin_screen.dart';
 import 'reporte_detalle_screen.dart';
 
 class BuildingsScreen extends StatefulWidget {
@@ -28,7 +29,6 @@ class BuildingsScreen extends StatefulWidget {
 
 
 class _BuildingsScreenState extends State<BuildingsScreen> {
-  // VARIABLES REFACTORIZADAS - Reemplazando Supabase
   String? _userId;
   String? _token;
   List<BuildingData> _edificios = [];
@@ -39,6 +39,7 @@ class _BuildingsScreenState extends State<BuildingsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _userName = "";
   BuildingData? _edificioEnEdicion;
+  MenuItemPermiso? _permisoEdificios;
 
   // VARIABLES CORREGIDAS PARA IMÁGENES
   File? _selectedFotoEdificio;
@@ -529,9 +530,16 @@ class _BuildingsScreenState extends State<BuildingsScreen> {
   void initState() {
     super.initState();
     _loadSessionData();
-    _getEdificios(); // Reemplaza _futureEdificios = _getEdificios();
+    _getEdificios();
     _getUserName();
+    _loadPermisos();
     _searchController.addListener(_onSearchChanged);
+  }
+
+  Future<void> _loadPermisos() async {
+    final items = await PermisosService.loadFromCache();
+    final permiso = items.where((m) => m.codigo == 'edificios').firstOrNull;
+    if (mounted) setState(() => _permisoEdificios = permiso);
   }
 
   void _onSearchChanged() {
@@ -642,30 +650,31 @@ class _BuildingsScreenState extends State<BuildingsScreen> {
             ),
           ),
 
-          // Botón Nuevo registro +
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/buildingRegistry1');
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+          // Botón Nuevo registro + (solo si tiene permiso de crear)
+          if (_permisoEdificios?.puedeCrear == true)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/buildingRegistry1');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                ),
-                child: const Text(
-                  "Nuevo registro +",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  child: const Text(
+                    "Nuevo registro +",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ),
-          ),
 
           // Lista de edificios - EXPANDIDO PARA USAR TODO EL ESPACIO DISPONIBLE
           Expanded(
@@ -837,25 +846,25 @@ class _BuildingsScreenState extends State<BuildingsScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 8),
-                        // Iconos de acciones
+                        // Iconos de acciones según permisos
                         Row(
                           mainAxisAlignment: MainAxisAlignment.start,
                           children: [
-                            // Icono Editar
-                            IconButton(
-                              icon: const Icon(Icons.edit, size: 20),
-                              onPressed: _isLoading ? null : () {
-                                _mostrarDialogoEdicion(edificio);
-                              },
-                              color: AppColors.primary,
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            ),
-                            // Icono PDF
+                            // Editar — solo si tiene permiso
+                            if (_permisoEdificios?.puedeEditar == true)
+                              IconButton(
+                                icon: const Icon(Icons.edit, size: 20),
+                                onPressed: _isLoading ? null : () {
+                                  _mostrarDialogoEdicion(edificio);
+                                },
+                                color: AppColors.primary,
+                                padding: const EdgeInsets.all(4),
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              ),
+                            // PDF — siempre visible (solo visualización)
                             IconButton(
                               icon: const Icon(Icons.picture_as_pdf, size: 20),
                               onPressed: () {
-                                // IMPORTANTE: Asegúrate de pasar 'edificio' y su 'puntuación'
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -870,19 +879,20 @@ class _BuildingsScreenState extends State<BuildingsScreen> {
                               padding: const EdgeInsets.all(4),
                               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                             ),
-                            // Icono Borrar
-                            IconButton(
-                              icon: const Icon(Icons.delete, size: 20),
-                              onPressed: _isLoading ? null : () {
-                                _mostrarDialogoConfirmacion(
-                                  edificio.idEdificio,
-                                  edificio.displayName,
-                                );
-                              },
-                              color: Colors.red,
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            ),
+                            // Eliminar — solo si tiene permiso
+                            if (_permisoEdificios?.puedeEliminar == true)
+                              IconButton(
+                                icon: const Icon(Icons.delete, size: 20),
+                                onPressed: _isLoading ? null : () {
+                                  _mostrarDialogoConfirmacion(
+                                    edificio.idEdificio,
+                                    edificio.displayName,
+                                  );
+                                },
+                                color: Colors.red,
+                                padding: const EdgeInsets.all(4),
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              ),
                           ],
                         ),
                       ],

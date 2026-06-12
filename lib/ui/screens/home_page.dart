@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/home_services.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/permisos_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/home_response.dart';
+import '../../data/models/permiso_model.dart';
+import '../widgets/dynamic_menu_grid.dart';
 import 'buildings_screen.dart';
 import 'assessed_buildings_screen.dart';
 import 'profile_admin_screen.dart';
+import 'building_registry_1_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -25,11 +29,52 @@ class _HomePageState extends State<HomePage> {
   String? _errorMessage;
   HomeStatistics? _statistics;
   UserInfo? _userInfo;
+  List<MenuItemPermiso> _menuItems = [];
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _loadMenuItems();
+  }
+
+  Future<void> _loadMenuItems() async {
+    // 1. Intentar desde caché
+    List<MenuItemPermiso> items = await PermisosService.loadFromCache();
+
+    // 2. Si caché vacío, fetch directo al backend
+    if (items.isEmpty) {
+      final rolId = await PermisosService.getRolId();
+      if (rolId != null && rolId.isNotEmpty) {
+        items = await PermisosService.fetchAndCache(rolId);
+      }
+    }
+
+    if (items.isNotEmpty && mounted) {
+      setState(() => _menuItems = items);
+    }
+  }
+
+  void _handleMenuTap(MenuItemPermiso item) {
+    Widget? screen;
+    switch (item.codigo) {
+      case 'edificios':
+        screen = const BuildingsScreen();
+        break;
+      case 'inspecciones':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Módulo Inspecciones — en desarrollo')),
+        );
+        return;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${item.nombre} — en desarrollo')),
+        );
+        return;
+    }
+    if (screen != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen!));
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -151,7 +196,7 @@ class _HomePageState extends State<HomePage> {
 
         // CREAR UserInfo CON DATOS COMPLETOS DEL REGISTRO
         final localUserInfo = UserInfo(
-          idUsuario: int.tryParse(_userId ?? '0') ?? 0,
+          idUsuario: _userId ?? '',
           nombre: _userName,
           email: registrationEmail,
           rol: _userRole ?? 'user',
@@ -327,7 +372,7 @@ class _HomePageState extends State<HomePage> {
 
       // CREAR UserInfo CON DATOS LOCALES
       final localUserInfo = UserInfo(
-        idUsuario: int.tryParse(_userId ?? '0') ?? 0,
+        idUsuario: _userId ?? '',
         nombre: _userName,
         email: prefs.getString('userEmail') ?? '',
         rol: _userRole ?? 'user',
@@ -674,33 +719,55 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildMenuOptions() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    final role = _userRole?.toLowerCase() ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildMenuOption(
-          context,
-          'Edificios registrados',
-          'https://cdn-icons-png.flaticon.com/512/1441/1441359.png',
-          Icons.apartment,
-              () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const BuildingsScreen()),
-            );
-          },
+        Row(
+          children: [
+            Icon(Icons.grid_view, color: AppColors.primary, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              _getRoleDisplayName(role),
+              style: const TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.text),
+            ),
+          ],
         ),
-        _buildMenuOption(
-          context,
-          'Edificios evaluados',
-          'https://cdn-icons-png.flaticon.com/128/12218/12218407.png',
-          Icons.assignment_turned_in,
-              () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AssessedBuildingsPage()),
-            );
-          },
-        ),
+        const SizedBox(height: 16),
+
+        // ── Menú dinámico desde permisos del backend ──
+        if (_menuItems.isNotEmpty)
+          DynamicMenuGrid(
+            items:       _menuItems,
+            onTap:       _handleMenuTap,
+            accentColor: AppColors.primary,
+          )
+        else
+          // Fallback mientras carga
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _buildMenuOption(
+                context, 'Edificios',
+                Icons.apartment,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BuildingsScreen())),
+              ),
+              _buildMenuOption(
+                context, 'Edificios Evaluados',
+                Icons.assignment_turned_in,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssessedBuildingsPage())),
+              ),
+              if (role == 'inspector')
+                _buildMenuOption(
+                  context, 'Registrar Edificio',
+                  Icons.add_business,
+                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BuildingRegistry1Screen())),
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -745,8 +812,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildMenuOption(
       BuildContext context,
       String title,
-      String imageUrl,
-      IconData fallbackIcon,
+      IconData icon,
       VoidCallback onTap,
       ) {
     return Expanded(
@@ -770,35 +836,14 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.network(
-                imageUrl,
+              Container(
                 width: 60,
                 height: 60,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      fallbackIcon,
-                      size: 30,
-                      color: AppColors.primary,
-                    ),
-                  );
-                },
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    width: 60,
-                    height: 60,
-                    child: const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  );
-                },
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 30, color: AppColors.primary),
               ),
               const SizedBox(height: 12),
               Text(

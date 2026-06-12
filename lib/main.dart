@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/ui/screens/building_registry_1_screen.dart';
 import 'package:flutter_application_1/ui/screens/home_admin_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_application_1/core/services/database_service.dart';
 import '../../ui/screens/assessed_buildings_screen.dart';
 import '../../ui/screens/assign_role_screen.dart';
 import '../../ui/screens/building_registry_2_screen.dart';
@@ -19,10 +19,9 @@ import '../../ui/screens/register_screen.dart';
 import '../../ui/screens/user_list_screen.dart';
 
 void main() async {
-  await Supabase.initialize(
-   anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxbnp2YXh1Ym95aHBkaWl2YWx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MzI3ODcsImV4cCI6MjA5NjAwODc4N30.m4kmKIc9rIeGMx0pRUnfNgWf95kV2MANhFG0UacrJMg",
-    url: "https://qqnzvaxuboyhpdiivalu.supabase.co",
-  );
+  WidgetsFlutterBinding.ensureInitialized();
+  // Restaurar token de sesión guardado en SharedPreferences
+  await DatabaseService.init();
   runApp(const MyApp());
 }
 
