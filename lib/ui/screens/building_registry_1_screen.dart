@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
@@ -19,8 +20,11 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
   final direccionController = TextEditingController();
   final codigoPostalController = TextEditingController();
 
-  File? _foto;
-  File? _grafico;
+  // Usar XFile + bytes para compatibilidad web
+  XFile? _fotoXFile;
+  XFile? _graficoXFile;
+  Uint8List? _fotoBytes;
+  Uint8List? _graficoBytes;
 
   int _selectedIndex = 0;
 
@@ -48,11 +52,12 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
               title: const Text("Galería"),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text("Cámara"),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
-            ),
+            if (!kIsWeb) // Cámara no siempre disponible en web
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text("Cámara"),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
           ],
         ),
       ),
@@ -63,9 +68,10 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
     final XFile? pickedFile = await picker.pickImage(source: source);
     if (pickedFile == null) return;
 
-    final file = File(pickedFile.path);
-    final fileSize = await file.length();
-    final mimeType = lookupMimeType(file.path);
+    // Leer bytes (funciona en web y mobile)
+    final bytes = await pickedFile.readAsBytes();
+    final fileSize = bytes.length;
+    final mimeType = lookupMimeType(pickedFile.name) ?? lookupMimeType(pickedFile.path);
 
     // VALIDACIÓN DE TAMAÑO (10MB máximo)
     if (fileSize > 10 * 1024 * 1024) {
@@ -75,7 +81,7 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
       return;
     }
 
-    // VALIDACIÓN DE FORMATO CORREGIDA - Solo JPG/PNG para ambos
+    // VALIDACIÓN DE FORMATO - Solo JPG/PNG
     if (mimeType != "image/jpeg" && mimeType != "image/png") {
       final String tipoArchivo = isFoto ? "foto" : "gráfico";
       ScaffoldMessenger.of(context).showSnackBar(
@@ -87,41 +93,28 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
       return;
     }
 
-    // VALIDACIÓN ADICIONAL: Verificar extensión del archivo
-    final String extension = file.path.toLowerCase();
-    if (!extension.endsWith('.jpg') &&
-        !extension.endsWith('.jpeg') &&
-        !extension.endsWith('.png')) {
-      final String tipoArchivo = isFoto ? "foto" : "gráfico";
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("La $tipoArchivo debe tener extensión .jpg, .jpeg o .png"),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    // Log para verificar archivo seleccionado (remover en producción)
+    // Log para verificar archivo seleccionado
     print('Archivo seleccionado:');
     print('  Tipo: ${isFoto ? "Foto" : "Gráfico"}');
-    print('  Ruta: ${file.path}');
+    print('  Nombre: ${pickedFile.name}');
     print('  MIME: $mimeType');
     print('  Tamaño: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
 
     setState(() {
       if (isFoto) {
-        _foto = file;
+        _fotoXFile = pickedFile;
+        _fotoBytes = bytes;
       } else {
-        _grafico = file;
+        _graficoXFile = pickedFile;
+        _graficoBytes = bytes;
       }
     });
 
     // Mostrar confirmación al usuario
-    final String tipoArchivo = isFoto ? "foto" : "gráfico";
+    final String tipoArchivo = isFoto ? "Foto" : "Gráfico";
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text("$tipoArchivo seleccionada correctamente"),
+        content: Text("$tipoArchivo seleccionado correctamente"),
         backgroundColor: Colors.green,
         duration: const Duration(seconds: 2),
       ),
@@ -132,14 +125,13 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
 
   void _siguiente() async {
     if (_formKey.currentState!.validate()) {
-      if (_foto == null) {
+      if (_fotoXFile == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Debes subir al menos una foto de la fachada")),
         );
         return;
       }
 
-      // CAMBIADO: Pasar archivos File directamente en lugar de subirlos aquí
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -147,9 +139,9 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
             nombre: nombreController.text,
             direccion: direccionController.text,
             codigoPostal: codigoPostalController.text,
-            // Pasar archivos File directamente
-            fotoEdificio: _foto,
-            graficoEdificio: _grafico,
+            // Pasar XFile en vez de File para compatibilidad web
+            fotoEdificioXFile: _fotoXFile,
+            graficoEdificioXFile: _graficoXFile,
           ),
         ),
       );
@@ -198,7 +190,7 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
     );
   }
 
-  Widget _previewWidget(File? file, String label) {
+  Widget _previewWidget(Uint8List? bytes, XFile? xFile, String label) {
     return Column(
       children: [
         Container(
@@ -208,11 +200,11 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
             border: Border.all(color: AppColors.gray300),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: file != null
+          child: bytes != null
               ? ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.file(
-              file,
+            child: Image.memory(
+              bytes,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return const Icon(
@@ -239,10 +231,10 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
           child: Text("Subir $label"),
         ),
         // Mostrar información del archivo seleccionado
-        if (file != null) ...[
+        if (xFile != null) ...[
           const SizedBox(height: 4),
           Text(
-            file.path.split('/').last,
+            xFile.name,
             style: const TextStyle(fontSize: 10, color: AppColors.gray500),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -278,8 +270,8 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        SizedBox(width: 150, child: _previewWidget(_foto, "Foto")),
-                        SizedBox(width: 150, child: _previewWidget(_grafico, "Gráfico")),
+                        SizedBox(width: 150, child: _previewWidget(_fotoBytes, _fotoXFile, "Foto")),
+                        SizedBox(width: 150, child: _previewWidget(_graficoBytes, _graficoXFile, "Gráfico")),
                       ],
                     ),
                     const SizedBox(height: 24),

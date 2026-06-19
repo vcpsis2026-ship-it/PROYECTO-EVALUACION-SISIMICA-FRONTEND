@@ -1,5 +1,5 @@
-// building_registry_5_screen.dart
-import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import '../../core/services/building_service.dart';
 import '../../core/theme/app_colors.dart';
@@ -15,8 +15,8 @@ class BuildingRegistry5Screen extends StatefulWidget {
   final String inspector;
   final String fecha;
   final String hora;
-  final File? fotoEdificio;
-  final File? graficoEdificio;
+  final XFile? fotoEdificioXFile;
+  final XFile? graficoEdificioXFile;
   final String pisos;
   final String area;
   final String anioConstruccion;
@@ -42,8 +42,8 @@ class BuildingRegistry5Screen extends StatefulWidget {
     this.inspector = '',
     this.fecha = '',
     this.hora = '',
-    this.fotoEdificio,
-    this.graficoEdificio,
+    this.fotoEdificioXFile,
+    this.graficoEdificioXFile,
     this.pisos = '',
     this.area = '',
     this.anioConstruccion = '',
@@ -169,8 +169,8 @@ class _BuildingRegistry5ScreenState extends State<BuildingRegistry5Screen> {
         comentarios: comentariosController.text.trim().isNotEmpty
             ? comentariosController.text.trim()
             : null,
-        fotoEdificio: widget.fotoEdificio,
-        graficoEdificio: widget.graficoEdificio,
+        fotoEdificio: widget.fotoEdificioXFile,
+        graficoEdificio: widget.graficoEdificioXFile,
       );
 
       if (response.success) {
@@ -346,8 +346,8 @@ class _BuildingRegistry5ScreenState extends State<BuildingRegistry5Screen> {
                       Text("Área por piso: ${widget.area} m²"),
                       Text("Año construcción: ${widget.anioConstruccion}"),
                       Text("Unidades: ${widget.unidades}"),
-                      Text("Fotos: ${widget.fotoEdificio != null ? 'Sí' : 'No'}"),
-                      Text("Gráfico: ${widget.graficoEdificio != null ? 'Sí' : 'No'}"),
+                      Text("Fotos: ${widget.fotoEdificioXFile != null ? 'Sí' : 'No'}"),
+                      Text("Gráfico: ${widget.graficoEdificioXFile != null ? 'Sí' : 'No'}"),
                     ],
                   ),
                 ),

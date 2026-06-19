@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/services/user_service.dart';
+import 'edit_user_screen.dart';
 
 class AssignRoleScreen extends StatefulWidget {
   final Map<String, dynamic> user;
@@ -16,6 +17,8 @@ class _AssignRoleScreenState extends State<AssignRoleScreen> {
   String? _selectedRole;
   String? _currentRole;
   bool _loading = false;
+  bool _loadingStatus = false;
+  late bool _isActivo;
 
   final List<Map<String, String>> _roles = [
     {'value': 'inspector', 'label': 'Inspector'},
@@ -25,6 +28,7 @@ class _AssignRoleScreenState extends State<AssignRoleScreen> {
   @override
   void initState() {
     super.initState();
+    _isActivo = widget.user['activo'] ?? true;
     _initializeCurrentRole();
   }
 
@@ -146,6 +150,61 @@ class _AssignRoleScreenState extends State<AssignRoleScreen> {
     return _currentRole!.toLowerCase() != _selectedRole!.toLowerCase();
   }
 
+  Future<void> _toggleStatus() async {
+    final bool newStatus = !_isActivo;
+    final String actionText = newStatus ? "activar" : "desactivar";
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('¿$actionText usuario?'.toUpperCase()),
+        content: Text('¿Estás seguro de que deseas $actionText a este usuario?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: newStatus ? Colors.green : Colors.red),
+            child: Text(newStatus ? 'Activar' : 'Desactivar', style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _loadingStatus = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final userId = widget.user['id']?.toString() ?? '';
+
+      final response = await UserService.updateUserStatus(
+        token: token,
+        userId: userId,
+        activo: newStatus,
+      );
+
+      if (response.success) {
+        setState(() {
+          _isActivo = newStatus;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Usuario ${newStatus ? 'activado' : 'desactivado'} con éxito'), backgroundColor: Colors.green),
+        );
+      } else {
+        _showErrorMessage(response.error ?? 'Error al actualizar estado');
+      }
+    } catch (e) {
+      _showErrorMessage('Error: $e');
+    } finally {
+      setState(() => _loadingStatus = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = widget.user;
@@ -174,6 +233,10 @@ class _AssignRoleScreenState extends State<AssignRoleScreen> {
         title: Text(_currentRole == null || _currentRole!.isEmpty ? "Asignar rol" : "Cambiar rol"),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context, true), // Siempre intentar recargar por si cambió el estado
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -233,8 +296,59 @@ class _AssignRoleScreenState extends State<AssignRoleScreen> {
                     currentRoleText,
                     valueColor: currentRoleColor,
                   ),
+                  const SizedBox(height: 8),
+                  _buildInfoRow(
+                    Icons.power_settings_new,
+                    "Estado",
+                    _isActivo ? "Activo" : "Inactivo",
+                    valueColor: _isActivo ? Colors.teal : Colors.red,
+                  ),
                 ],
               ),
+            ),
+            
+            const SizedBox(height: 16),
+
+            // Botones de acción para el usuario
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EditUserScreen(user: widget.user),
+                        ),
+                      );
+                      if (result == true) {
+                        Navigator.pop(context, true); // Regresar recargando
+                      }
+                    },
+                    icon: const Icon(Icons.edit, size: 18),
+                    label: const Text("Editar usuario"),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _loadingStatus
+                      ? const Center(child: CircularProgressIndicator())
+                      : ElevatedButton.icon(
+                          onPressed: _toggleStatus,
+                          icon: Icon(_isActivo ? Icons.block : Icons.check_circle_outline, size: 18, color: Colors.white),
+                          label: Text(_isActivo ? "Desactivar usuario" : "Activar usuario", style: const TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isActivo ? Colors.red : Colors.green,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 32),

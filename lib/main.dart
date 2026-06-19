@@ -17,9 +17,17 @@ import '../../ui/screens/profile_page.dart';
 import '../../ui/screens/recovery_password.dart';
 import '../../ui/screens/register_screen.dart';
 import '../../ui/screens/user_list_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializar Supabase para el generador de PDF
+  await Supabase.initialize(
+    url: 'https://pbjbzlopivfbkqcstcus.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiamJ6bG9waXZmYmtxY3N0Y3VzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NDQyNjMsImV4cCI6MjA5NjAyMDI2M30.s_L32ht3D6BZDpw04P17b5N4I0g06cjeObS2UqNXUnE',
+  );
+
   // Restaurar token de sesión guardado en SharedPreferences
   await DatabaseService.init();
   runApp(const MyApp());

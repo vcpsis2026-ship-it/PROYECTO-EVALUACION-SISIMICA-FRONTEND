@@ -283,7 +283,7 @@ class RegisterService {
     }
 
     // VALIDAR ROL - ACEPTA TODOS LOS ROLES VÁLIDOS DEL SISTEMA
-    const validRoles = ['admin', 'inspector', 'ayudante'];
+    const validRoles = ['administrador', 'inspector', 'ayudante'];
     if (!validRoles.contains(role.trim().toLowerCase())) {
       return 'Rol inválido. Debe ser: ${validRoles.join(', ')}';
     }

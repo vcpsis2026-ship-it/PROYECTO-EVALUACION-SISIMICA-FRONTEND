@@ -58,8 +58,17 @@ class AuthService {
             );
             if (userResp.success && userResp.data != null) {
               final raw = userResp.data;
-              final Map<String, dynamic> ud =
-                  raw is Map<String, dynamic> ? raw : {};
+              Map<String, dynamic> ud = {};
+              if (raw is Map<String, dynamic>) {
+                ud = raw;
+              } else if (raw is List && raw.isNotEmpty && raw.first is Map<String, dynamic>) {
+                // Backend devolvió un array — buscar nuestro usuario
+                final match = raw.firstWhere(
+                  (item) => item['id_usuario']?.toString() == userId,
+                  orElse: () => raw.first,
+                );
+                ud = Map<String, dynamic>.from(match);
+              }
               nombre    = ud['nombre']?.toString();
               rolCodigo = ud['rol_codigo']?.toString();
               rolId     = ud['rol_id']?.toString();

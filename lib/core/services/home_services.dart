@@ -63,25 +63,41 @@ class HomeService {
         print('Profile response body: ${response.body}');
 
         if (response.statusCode == 200) {
-          final Map<String, dynamic> responseData = json.decode(response.body);
+          final decoded = json.decode(response.body);
 
           // MANEJO SEGURO DE DIFERENTES ESTRUCTURAS DE RESPUESTA
           Map<String, dynamic> userData;
 
-          // El servidor puede retornar diferentes estructuras:
-          // - Directamente los datos del usuario
-          // - { data: {userData} }
-          // - { user: {userData} }
-          if (responseData.containsKey('data')) {
-            userData = responseData['data'] as Map<String, dynamic>;
-            print('Datos encontrados en responseData["data"]');
-          } else if (responseData.containsKey('user')) {
-            userData = responseData['user'] as Map<String, dynamic>;
-            print('Datos encontrados en responseData["user"]');
+          if (decoded is List) {
+            // El backend retornó una lista — buscar nuestro usuario por ID
+            print('Respuesta es una lista con ${decoded.length} elementos, buscando userId=$userId');
+            final match = decoded.firstWhere(
+              (item) => item['id_usuario']?.toString() == userId,
+              orElse: () => null,
+            );
+            if (match == null) {
+              return HomeResponse.error('Usuario no encontrado en la lista (ID: $userId)');
+            }
+            userData = Map<String, dynamic>.from(match);
+          } else if (decoded is Map<String, dynamic>) {
+            final responseData = decoded;
+            // El servidor puede retornar diferentes estructuras:
+            // - Directamente los datos del usuario
+            // - { data: {userData} }
+            // - { user: {userData} }
+            if (responseData.containsKey('data')) {
+              userData = responseData['data'] as Map<String, dynamic>;
+              print('Datos encontrados en responseData["data"]');
+            } else if (responseData.containsKey('user')) {
+              userData = responseData['user'] as Map<String, dynamic>;
+              print('Datos encontrados en responseData["user"]');
+            } else {
+              // Asumir que responseData ES los datos del usuario
+              userData = responseData;
+              print('Usando responseData directamente como userData');
+            }
           } else {
-            // Asumir que responseData ES los datos del usuario
-            userData = responseData;
-            print('Usando responseData directamente como userData');
+            return HomeResponse.error('Formato de respuesta no reconocido');
           }
 
           // Validar que userData tiene los campos mínimos necesarios

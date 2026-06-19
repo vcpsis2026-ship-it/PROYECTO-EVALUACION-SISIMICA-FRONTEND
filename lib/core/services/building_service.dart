@@ -1,5 +1,7 @@
 // building_service.dart - VERSIÓN CORREGIDA PARA COMPATIBILIDAD CON SERVIDOR
+import 'dart:convert';
 import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import '../config/database_config.dart';
 import '../constants/database_endpoints.dart';
 import 'database_service.dart';
@@ -37,8 +39,8 @@ class BuildingService {
     String? comentarios,
 
     // Archivos
-    File? fotoEdificio,
-    File? graficoEdificio,
+    XFile? fotoEdificio,
+    XFile? graficoEdificio,
 
     int maxRetries = 2,
   }) async {
@@ -134,32 +136,18 @@ class BuildingService {
 
         // ===== AGREGAR ARCHIVOS CON VALIDACIONES MEJORADAS =====
         if (fotoEdificio != null) {
-          // Verificar que el archivo existe y es accesible
-          if (!await fotoEdificio.exists()) {
-            return BuildingResponse.failure(
-                error: 'El archivo de foto del edificio no existe o no es accesible'
-            );
-          }
-
           request.files.add(
-            await DatabaseService.createMultipartFile(fotoEdificio, 'foto_edificio'),
+            await DatabaseService.createMultipartFileFromXFile(fotoEdificio, 'foto_edificio'),
           );
-          print('Archivo foto_edificio agregado: ${fotoEdificio.path}');
+          print('Archivo foto_edificio agregado: ${fotoEdificio.name}');
           print('Tamaño del archivo: ${await fotoEdificio.length()} bytes');
         }
 
         if (graficoEdificio != null) {
-          // Verificar que el archivo existe y es accesible
-          if (!await graficoEdificio.exists()) {
-            return BuildingResponse.failure(
-                error: 'El archivo de gráfico del edificio no existe o no es accesible'
-            );
-          }
-
           request.files.add(
-            await DatabaseService.createMultipartFile(graficoEdificio, 'grafico_edificio'),
+            await DatabaseService.createMultipartFileFromXFile(graficoEdificio, 'grafico_edificio'),
           );
-          print('Archivo grafico_edificio agregado: ${graficoEdificio.path}');
+          print('Archivo grafico_edificio agregado: ${graficoEdificio.name}');
           print('Tamaño del archivo: ${await graficoEdificio.length()} bytes');
         }
 
@@ -319,19 +307,19 @@ class BuildingService {
   }
 
   // ===== VALIDACIÓN DE ARCHIVOS =====
-  static String? _validateFiles(File? fotoEdificio, File? graficoEdificio) {
+  static String? _validateFiles(XFile? fotoEdificio, XFile? graficoEdificio) {
     const int maxFileSize = 10 * 1024 * 1024; // 10MB
     const List<String> allowedExtensions = ['.jpg', '.jpeg', '.png'];
 
     if (fotoEdificio != null) {
-      final extension = fotoEdificio.path.toLowerCase().split('.').last;
+      final extension = fotoEdificio.name.toLowerCase().split('.').last;
       if (!allowedExtensions.contains('.$extension')) {
         return 'Formato de foto no válido. Use JPG o PNG.';
       }
     }
 
     if (graficoEdificio != null) {
-      final extension = graficoEdificio.path.toLowerCase().split('.').last;
+      final extension = graficoEdificio.name.toLowerCase().split('.').last;
       if (!allowedExtensions.contains('.$extension')) {
         return 'Formato de gráfico no válido. Use JPG o PNG.';
       }

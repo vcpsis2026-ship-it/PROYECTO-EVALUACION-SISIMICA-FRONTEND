@@ -88,6 +88,12 @@ class _UserListScreenState extends State<UserListScreen> {
       case 'ayudante':
         filteredByRole = _users.where((user) => user.rol.toLowerCase() == 'ayudante').toList();
         break;
+      case 'activos':
+        filteredByRole = _users.where((user) => user.activo).toList();
+        break;
+      case 'inactivos':
+        filteredByRole = _users.where((user) => !user.activo).toList();
+        break;
       case 'todos':
       default:
         filteredByRole = _users;
@@ -181,11 +187,15 @@ class _UserListScreenState extends State<UserListScreen> {
                 children: [
                   _buildFilterChip('todos', 'Todos', _getTotalCount()),
                   const SizedBox(width: 8),
-                  _buildFilterChip('sin_rol', 'Sin Rol', _getCountByRole('sin_rol')),
+                  _buildFilterChip('activos', 'Activos', _getCountByRole('activos')),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('inactivos', 'Inactivos', _getCountByRole('inactivos')),
                   const SizedBox(width: 8),
                   _buildFilterChip('inspector', 'Inspectores', _getCountByRole('inspector')),
                   const SizedBox(width: 8),
                   _buildFilterChip('ayudante', 'Ayudantes', _getCountByRole('ayudante')),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('sin_rol', 'Sin Rol', _getCountByRole('sin_rol')),
                 ],
               ),
             ),
@@ -225,6 +235,10 @@ class _UserListScreenState extends State<UserListScreen> {
 
   Color _getFilterColor(String filter) {
     switch (filter) {
+      case 'activos':
+        return Colors.teal;
+      case 'inactivos':
+        return Colors.red;
       case 'sin_rol':
         return Colors.orange;
       case 'inspector':
@@ -242,6 +256,10 @@ class _UserListScreenState extends State<UserListScreen> {
 
   int _getCountByRole(String role) {
     switch (role) {
+      case 'activos':
+        return _users.where((user) => user.activo).length;
+      case 'inactivos':
+        return _users.where((user) => !user.activo).length;
       case 'sin_rol':
         return _users.where((user) {
           final rol = user.rol.trim().toLowerCase();
@@ -388,6 +406,10 @@ class _UserListScreenState extends State<UserListScreen> {
 
   String _getEmptyMessage() {
     switch (_selectedFilter) {
+      case 'activos':
+        return 'No hay usuarios activos';
+      case 'inactivos':
+        return 'No hay usuarios inactivos';
       case 'sin_rol':
         return 'No hay usuarios sin rol';
       case 'inspector':
@@ -401,6 +423,10 @@ class _UserListScreenState extends State<UserListScreen> {
 
   String _getEmptySubMessage() {
     switch (_selectedFilter) {
+      case 'activos':
+        return 'Todos los usuarios están inactivos';
+      case 'inactivos':
+        return 'Todos los usuarios están activos';
       case 'sin_rol':
         return 'Todos los usuarios ya tienen un rol asignado';
       case 'inspector':
@@ -506,6 +532,23 @@ class _UserListScreenState extends State<UserListScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: user.activo ? Colors.teal.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: user.activo ? Colors.teal.withOpacity(0.3) : Colors.red.withOpacity(0.3)),
+              ),
+              child: Text(
+                user.activo ? "Activo" : "Inactivo",
+                style: TextStyle(
+                  color: user.activo ? Colors.teal : Colors.red,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ],
         ),
         trailing: Row(
@@ -527,6 +570,8 @@ class _UserListScreenState extends State<UserListScreen> {
             'telefono': user.telefono,
             'rol': user.rol,
             'foto_perfil_url': user.fotoPerfilUrl,
+            'activo': user.activo,
+            'direccion': user.direccion,
           };
 
           final result = await Navigator.push(

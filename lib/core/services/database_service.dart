@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mime/mime.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 import '../config/database_config.dart';
 import '../../data/models/database_response.dart';
 
@@ -294,6 +295,20 @@ class DatabaseService {
     }
     return await http.MultipartFile.fromPath(file.path, fieldName,
         contentType: contentType);
+  }
+
+  static Future<http.MultipartFile> createMultipartFileFromXFile(
+      XFile file, String fieldName) async {
+    final ext = file.name.toLowerCase();
+    MediaType contentType;
+    if (ext.endsWith('.png')) {
+      contentType = MediaType('image', 'png');
+    } else {
+      contentType = MediaType('image', 'jpeg');
+    }
+    final bytes = await file.readAsBytes();
+    return http.MultipartFile.fromBytes(fieldName, bytes,
+        filename: file.name, contentType: contentType);
   }
 
   static Future<DatabaseResponse<Map<String, dynamic>>> sendMultipartRequest(

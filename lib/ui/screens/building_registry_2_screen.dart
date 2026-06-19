@@ -1,6 +1,5 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../core/theme/app_colors.dart';
@@ -92,16 +91,16 @@ class BuildingRegistry2Screen extends StatefulWidget {
   final String nombre;
   final String direccion;
   final String codigoPostal;
-  final File? fotoEdificio;
-  final File? graficoEdificio;
+  final XFile? fotoEdificioXFile;
+  final XFile? graficoEdificioXFile;
 
   const BuildingRegistry2Screen({
     super.key,
     this.nombre = '',
     this.direccion = '',
     this.codigoPostal = '',
-    this.fotoEdificio,
-    this.graficoEdificio,
+    this.fotoEdificioXFile,
+    this.graficoEdificioXFile,
   });
 
   @override
@@ -246,8 +245,8 @@ class _BuildingRegistry2ScreenState extends State<BuildingRegistry2Screen> {
             nombre: widget.nombre,
             direccion: widget.direccion,
             codigoPostal: widget.codigoPostal,
-            fotoEdificio: widget.fotoEdificio,
-            graficoEdificio: widget.graficoEdificio,
+            fotoEdificioXFile: widget.fotoEdificioXFile,
+            graficoEdificioXFile: widget.graficoEdificioXFile,
             otrasIdentificaciones: otrasIdentificacionesController.text,
             uso: usoController.text,
             latitud: latitudController.text,

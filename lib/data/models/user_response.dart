@@ -106,7 +106,7 @@ class UsersListResponse {
 
 // ACTUALIZACIÓN EN UserData - user_response.dart
 class UserData {
-  final int idUsuario;
+  final String idUsuario;
   final String nombre;
   final String email;
   final String? cedula;
@@ -114,6 +114,7 @@ class UserData {
   final String rol;
   final String? direccion;
   final String? fotoPerfilUrl;
+  final bool activo;
 
   UserData({
     required this.idUsuario,
@@ -124,17 +125,18 @@ class UserData {
     required this.rol,
     this.direccion,
     this.fotoPerfilUrl,
+    this.activo = true,
   });
 
   factory UserData.fromJson(Map<String, dynamic> json) {
-    // Manejar diferentes formatos de ID
-    int? userId;
+    // Manejar diferentes formatos de ID (UUID como string)
+    String? userId;
     if (json['id_usuario'] != null) {
-      userId = json['id_usuario'] is int ? json['id_usuario'] : int.tryParse(json['id_usuario'].toString());
+      userId = json['id_usuario'].toString();
     } else if (json['id'] != null) {
-      userId = json['id'] is int ? json['id'] : int.tryParse(json['id'].toString());
+      userId = json['id'].toString();
     } else if (json['userId'] != null) {
-      userId = json['userId'] is int ? json['userId'] : int.tryParse(json['userId'].toString());
+      userId = json['userId'].toString();
     }
 
     // MEJORADO: Manejo de URL de foto más robusto
@@ -156,7 +158,7 @@ class UserData {
     }
 
     return UserData(
-      idUsuario: userId ?? 0,
+      idUsuario: userId ?? '',
       nombre: json['nombre']?.toString() ?? json['name']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       cedula: json['cedula']?.toString(),
@@ -164,6 +166,7 @@ class UserData {
       rol: json['rol']?.toString() ?? json['rol_codigo']?.toString() ?? json['role']?.toString() ?? '',
       direccion: json['direccion']?.toString() ?? json['address']?.toString(),
       fotoPerfilUrl: fotoUrl,
+      activo: json['activo'] ?? true,
     );
   }
 
@@ -177,6 +180,7 @@ class UserData {
       'rol': rol,
       'direccion': direccion,
       'foto_perfil_url': fotoPerfilUrl,
+      'activo': activo,
     };
   }
 
@@ -278,7 +282,7 @@ class UserData {
 
   // Método para copiar con cambios
   UserData copyWith({
-    int? idUsuario,
+    String? idUsuario,
     String? nombre,
     String? email,
     String? cedula,

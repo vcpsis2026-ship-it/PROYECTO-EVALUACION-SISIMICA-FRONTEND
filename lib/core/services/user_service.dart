@@ -214,7 +214,31 @@ class UserService {
     return null;
   }
 
-  // ── Privados ──────────────────────────────────────────────────
+  // ── Actualizar estado de usuario (Activar/Desactivar) ────────
+  static Future<UserResponse> updateUserStatus({
+    required String token,
+    required String userId,
+    required bool activo,
+  }) async {
+    DatabaseService.setAuthToken(token);
+    try {
+      final response = await DatabaseService.patch<dynamic>(
+        '${DatabaseEndpoints.usuarioById(userId)}/estado',
+        {'activo': activo},
+        requiresAuth: true,
+      );
+      if (response.success && response.data != null) {
+        final map = _toMap(response.data);
+        if (map != null) return UserResponse.success(UserData.fromJson(map));
+        return UserResponse.error('Estructura de respuesta inválida');
+      }
+      return UserResponse.error(_errorMsg(response));
+    } catch (e) {
+      return UserResponse.error('Error inesperado: $e');
+    }
+  }
+
+  // ── Métodos de Ayuda ──────────────────────────────────────────────────
   static Future<DatabaseResponse<Map<String, dynamic>>> _putMultipart(
     String userId,
     Map<String, String> fields,
@@ -261,6 +285,10 @@ class UserService {
           data.containsKey('email')) return data;
       if (data['data'] is Map<String, dynamic>) return data['data'];
       if (data['user'] is Map<String, dynamic>) return data['user'];
+    }
+    // Si el backend devolvió un array, tomar el primer elemento
+    if (data is List && data.isNotEmpty && data.first is Map<String, dynamic>) {
+      return data.first as Map<String, dynamic>;
     }
     return null;
   }

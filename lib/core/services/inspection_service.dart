@@ -7,8 +7,8 @@ class InspectionService {
   static Future<bool> saveInspection(Map<String, dynamic> data, String token) async {
     try {
       // Usamos la URL que ya tienes configurada en tu proyecto
-      // El endpoint debe coincidir con el que pusimos en Node.js (/inspections)
-      final url = Uri.parse('${DatabaseConfig.getServerUrl()}/inspections');
+      // El endpoint debe coincidir con el que pusimos en Node.js (/inspecciones)
+      final url = Uri.parse('${DatabaseConfig.getServerUrl()}/inspecciones');
 
       final response = await http.post(
         url,

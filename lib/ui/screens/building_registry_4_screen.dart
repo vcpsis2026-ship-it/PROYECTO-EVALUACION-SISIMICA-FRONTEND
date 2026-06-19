@@ -1,6 +1,5 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import 'building_registry_5_screen.dart';
 
@@ -14,8 +13,8 @@ class BuildingRegistry4Screen extends StatefulWidget {
   final String inspector;
   final String fecha;
   final String hora;
-  final File? fotoEdificio;
-  final File? graficoEdificio;
+  final XFile? fotoEdificioXFile;
+  final XFile? graficoEdificioXFile;
   final String pisos;
   final String area;
   final String anioConstruccion;
@@ -35,8 +34,8 @@ class BuildingRegistry4Screen extends StatefulWidget {
     this.inspector = '',
     this.fecha = '',
     this.hora = '',
-    this.fotoEdificio,
-    this.graficoEdificio,
+    this.fotoEdificioXFile,
+    this.graficoEdificioXFile,
     this.pisos = '',
     this.area = '',
     this.anioConstruccion = '',
@@ -117,8 +116,8 @@ class _BuildingRegistry4ScreenState extends State<BuildingRegistry4Screen> {
             inspector: widget.inspector,
             fecha: widget.fecha,
             hora: widget.hora,
-            fotoEdificio: widget.fotoEdificio,
-            graficoEdificio: widget.graficoEdificio,
+            fotoEdificioXFile: widget.fotoEdificioXFile,
+            graficoEdificioXFile: widget.graficoEdificioXFile,
             pisos: widget.pisos,
             area: widget.area,
             anioConstruccion: widget.anioConstruccion,

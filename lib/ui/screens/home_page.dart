@@ -110,8 +110,8 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      if (_userId == null) {
-        _handleInvalidSession('ID de usuario no encontrado');
+      if (_userId == null || _userId!.isEmpty) {
+        _handleInvalidSession('ID de usuario no encontrado. Por favor inicie sesión nuevamente.');
         return;
       }
 
