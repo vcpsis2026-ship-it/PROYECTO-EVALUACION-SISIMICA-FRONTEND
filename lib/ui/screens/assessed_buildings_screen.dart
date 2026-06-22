@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/helpers/navigation_helper.dart';
+import '../../core/services/home_services.dart';
+import '../../data/models/home_response.dart';
 import '../../core/services/building_list_service.dart';
 import '../../data/models/building_list_response.dart';
 import 'profile_admin_screen.dart';
@@ -81,14 +84,9 @@ class _AssessedBuildingsPageState extends State<AssessedBuildingsPage> {
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
     if (index == 0) {
-      Navigator.pop(context); // volver al home
+      NavigationHelper.navigateToHome(context, isReplacement: true);
     } else if (index == 1 && _userId != null && _token != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProfileAdminScreen(userId: _userId, token: _token),
-        ),
-      );
+      NavigationHelper.navigateToProfile(context, isReplacement: false);
     }
   }
 

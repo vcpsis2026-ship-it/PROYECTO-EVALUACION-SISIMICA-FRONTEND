@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/helpers/navigation_helper.dart';
 import '../../data/models/building_form_data.dart';
 import 'building_registry_2_screen.dart';
 
@@ -55,9 +56,9 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
     if (index == 0) {
-      Navigator.pushNamed(context, '/home');
+      NavigationHelper.navigateToHome(context, isReplacement: true);
     } else if (index == 1) {
-      Navigator.pushNamed(context, '/profile');
+      NavigationHelper.navigateToProfile(context, isReplacement: false);
     }
   }
 
@@ -365,7 +366,7 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
                         ),
                       ),
                       onPressed: () {
-                        Navigator.pushNamed(context, '/building');
+                        Navigator.pop(context);
                       },
                       child: const Text(
                         "Cancelar",

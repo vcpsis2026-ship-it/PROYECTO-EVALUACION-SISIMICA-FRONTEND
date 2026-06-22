@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:flutter_application_1/ui/screens/building_registry_3_screen.dart';
+import '../../core/helpers/navigation_helper.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/building_form_data.dart';
 import 'building_registry_3_screen.dart';
@@ -134,9 +136,9 @@ class _BuildingRegistry2ScreenState extends State<BuildingRegistry2Screen> {
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
     if (index == 0) {
-      Navigator.pushNamed(context, '/home');
+      NavigationHelper.navigateToHome(context, isReplacement: true);
     } else if (index == 1) {
-      Navigator.pushNamed(context, '/profile');
+      NavigationHelper.navigateToProfile(context, isReplacement: false);
     }
   }
 

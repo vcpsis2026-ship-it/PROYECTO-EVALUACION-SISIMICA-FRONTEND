@@ -48,6 +48,9 @@ class DatabaseEndpoints {
   // ── Auditoría ─────────────────────────────────────────────────
   static const String auditoria = '/auditoria';
 
+  // ── Admin Dashboard ───────────────────────────────────────────
+  static const String adminDashboard = '/admin/dashboard';
+
   // ── Helpers ───────────────────────────────────────────────────
   /// Construye: /usuarios/<uuid>
   static String usuarioById(String id) => '$usuarios/$id';

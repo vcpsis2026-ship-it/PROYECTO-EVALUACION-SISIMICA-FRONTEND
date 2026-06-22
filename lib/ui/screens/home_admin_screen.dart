@@ -3,9 +3,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/home_services.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/permisos_service.dart';
+import '../../core/services/dashboard_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/home_response.dart';
 import '../../data/models/permiso_model.dart';
+import '../../data/models/dashboard_stats.dart';
 import '../widgets/dynamic_menu_grid.dart';
 import 'buildings_screen.dart';
 import 'assessed_buildings_screen.dart';
@@ -31,6 +33,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
   HomeStatistics? _statistics;
   UserInfo? _userInfo;
   List<MenuItemPermiso> _menuItems = [];
+  DashboardStats? _dashboardStats;
 
   @override
   void initState() {
@@ -97,6 +100,9 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
         debugPrint('Admin login normal, usando flujo estándar...');
         await _loadAdminDataFromServer();
       }
+
+      // Cargar estadísticas del dashboard
+      await _loadDashboardStats();
 
     } catch (e) {
       debugPrint('Error en _loadUserData: $e');
@@ -553,12 +559,26 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     }
   }
 
+  Future<void> _loadDashboardStats() async {
+    if (_token == null) return;
+    try {
+      final stats = await DashboardService.getAdminStats(token: _token!);
+      if (stats != null && mounted) {
+        setState(() => _dashboardStats = stats);
+        debugPrint('Dashboard stats cargados correctamente');
+      }
+    } catch (e) {
+      debugPrint('Error cargando dashboard stats: $e');
+    }
+  }
+
   Future<void> _refreshData() async {
     setState(() {
       _loading = true;
       _errorMessage = null;
     });
     await _loadAdminDataFromServer();
+    await _loadDashboardStats();
   }
 
   @override
@@ -704,10 +724,8 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
               _buildAdminInfoCard(),
             ],
 
-            if (_statistics != null) ...[
-              const SizedBox(height: 24),
-              _buildStatisticsSection(),
-            ],
+            const SizedBox(height: 24),
+            _buildDashboardSection(),
 
             const SizedBox(height: 32),
             _buildAdminMenuOptions(),
@@ -890,8 +908,12 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     );
   }
 
-  Widget _buildStatisticsSection() {
-    if (_statistics == null || _isStatisticsEmpty()) {
+  // ══════════════════════════════════════════════════════════════
+  //  DASHBOARD — RESUMEN GENERAL
+  // ══════════════════════════════════════════════════════════════
+
+  Widget _buildDashboardSection() {
+    if (_dashboardStats == null) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
@@ -900,33 +922,41 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey.shade200),
         ),
-        child: const Center(
-          child: Column(
-            children: [
-              Icon(Icons.analytics_outlined, size: 48, color: AppColors.gray500),
-              SizedBox(height: 8),
-              Text(
-                'Estadísticas no disponibles',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppColors.gray500,
-                ),
+        child: Column(
+          children: [
+            const Icon(Icons.analytics_outlined, size: 48, color: AppColors.gray500),
+            const SizedBox(height: 8),
+            const Text(
+              'Cargando resumen general...',
+              style: TextStyle(fontSize: 16, color: AppColors.gray500),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: _loadDashboardStats,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Reintentar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
 
+    final stats = _dashboardStats!;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        // ── Título ──
+        const Row(
           children: [
-            const Icon(Icons.analytics, color: Colors.red, size: 20),
-            const SizedBox(width: 8),
-            const Text(
-              'Estadísticas del Sistema',
+            Icon(Icons.dashboard, color: Colors.red, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Resumen General',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -936,104 +966,306 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        _buildStatisticsGrid(),
-      ],
-    );
-  }
 
-  bool _isStatisticsEmpty() {
-    return _statistics!.totalEdificios == 0 &&
-        _statistics!.edificiosEvaluados == 0 &&
-        _statistics!.edificiosPendientes == 0 &&
-        _statistics!.inspeccionesRealizadas == 0;
-  }
-
-  Widget _buildStatisticsGrid() {
-    return Column(
-      children: [
+        // ── Grid 2×2 de tarjetas ──
         Row(
           children: [
             Expanded(
-              child: _buildStatCard(
-                'Total Edificios',
-                _statistics!.totalEdificios.toString(),
+              child: _buildDashStatCard(
+                'Edificios',
+                stats.totalEdificios.toString(),
                 Icons.apartment,
                 Colors.red,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
-              child: _buildStatCard(
-                'Evaluados',
-                _statistics!.edificiosEvaluados.toString(),
-                Icons.check_circle,
-                Colors.green,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                'Pendientes',
-                _statistics!.edificiosPendientes.toString(),
-                Icons.pending,
-                Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
+              child: _buildDashStatCard(
                 'Inspecciones',
-                _statistics!.inspeccionesRealizadas.toString(),
+                stats.totalInspecciones.toString(),
                 Icons.assignment,
                 Colors.blue,
               ),
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _buildDashStatCard(
+                'Inspectores',
+                stats.totalInspectores.toString(),
+                Icons.search,
+                Colors.indigo,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildDashStatCard(
+                'Ayudantes',
+                stats.totalAyudantes.toString(),
+                Icons.build,
+                Colors.green,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        // ── Distribución de puntuaciones ──
+        _buildScoreDistribution(stats.distribucionPuntuacion),
+
+        // ── Top 3 edificios ──
+        if (stats.topEdificios.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _buildTopEdificios(stats.topEdificios),
+        ],
       ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildDashStatCard(String title, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withOpacity(0.08),
             spreadRadius: 1,
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
-        border: Border.all(color: color.withOpacity(0.1)),
+        border: Border.all(color: color.withOpacity(0.15)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.gray500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScoreDistribution(DistribucionPuntuacion dist) {
+    final total = dist.total;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+          const Row(
+            children: [
+              Icon(Icons.bar_chart, size: 18, color: AppColors.text),
+              SizedBox(width: 6),
+              Text(
+                'Distribución de Puntuaciones',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.text,
+                ),
+              ),
+            ],
           ),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.gray500,
+          const SizedBox(height: 12),
+
+          // Barra segmentada
+          if (total > 0)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                height: 18,
+                child: Row(
+                  children: [
+                    if (dist.riesgoAlto > 0)
+                      Expanded(
+                        flex: dist.riesgoAlto,
+                        child: Container(color: Colors.red.shade400),
+                      ),
+                    if (dist.riesgoMedio > 0)
+                      Expanded(
+                        flex: dist.riesgoMedio,
+                        child: Container(color: Colors.amber.shade400),
+                      ),
+                    if (dist.riesgoBajo > 0)
+                      Expanded(
+                        flex: dist.riesgoBajo,
+                        child: Container(color: Colors.green.shade400),
+                      ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                height: 18,
+                color: Colors.grey.shade200,
+              ),
             ),
+
+          const SizedBox(height: 10),
+
+          // Leyendas debajo de la barra
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildLegendItem('< 80', dist.riesgoAlto, Colors.red.shade400),
+              _buildLegendItem('80 - 120', dist.riesgoMedio, Colors.amber.shade400),
+              _buildLegendItem('> 120', dist.riesgoBajo, Colors.green.shade400),
+            ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, int count, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '$label ($count)',
+          style: const TextStyle(fontSize: 11, color: AppColors.gray500),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopEdificios(List<TopEdificio> top) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.emoji_events, size: 18, color: Colors.amber),
+              SizedBox(width: 6),
+              Text(
+                'Top Edificios Inspeccionados',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.text,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...top.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final edificio = entry.value;
+            final medals = ['🥇', '🥈', '🥉'];
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Text(
+                    medals[idx],
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      edificio.nombreEdificio,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.text,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${edificio.totalInspecciones}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );

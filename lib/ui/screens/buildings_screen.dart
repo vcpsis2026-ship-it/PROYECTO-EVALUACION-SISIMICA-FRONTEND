@@ -3,6 +3,7 @@ import 'package:flutter_application_1/ui/screens/profile_page.dart';
 import 'home_page.dart';
 import '../../core/theme/app_colors.dart';
 import '../../ui/screens/building_registry_1_screen.dart';
+import '../../core/helpers/navigation_helper.dart';
 import '../../core/services/building_list_service.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/permisos_service.dart';
@@ -568,15 +569,7 @@ class _BuildingsScreenState extends State<BuildingsScreen> {
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
     if (index == 0) {
-      // Verificar el rol del usuario para redirigirlo a la pantalla principal correcta
-      if (_userRole != null && 
-         (_userRole!.toLowerCase() == 'administrador' || 
-          _userRole!.toLowerCase() == 'admin' || 
-          _userRole == '1')) {
-        Navigator.pushReplacementNamed(context, '/home_admin');
-      } else {
-        Navigator.pushReplacementNamed(context, '/home');
-      }
+      NavigationHelper.navigateToHome(context, isReplacement: true);
     } else if (index == 1) {
       // Verificar que tengamos los datos antes de navegar
       if (_userId != null && _token != null) {
