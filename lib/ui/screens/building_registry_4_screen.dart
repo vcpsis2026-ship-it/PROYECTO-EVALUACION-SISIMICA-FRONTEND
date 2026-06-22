@@ -1,49 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/models/building_form_data.dart';
 import 'building_registry_5_screen.dart';
 
 class BuildingRegistry4Screen extends StatefulWidget {
-  final String nombre;
-  final String direccion;
-  final String codigoPostal;
-  final String uso;
-  final String latitud;
-  final String longitud;
-  final String inspector;
-  final String fecha;
-  final String hora;
-  final XFile? fotoEdificioXFile;
-  final XFile? graficoEdificioXFile;
-  final String pisos;
-  final String area;
-  final String anioConstruccion;
-  final String anioCodigo;
-  final bool ampliacionSi;
-  final String anioAmpliacion;
-  final String verificacion;
-
-  const BuildingRegistry4Screen({
-    super.key,
-    this.nombre = '',
-    this.direccion = '',
-    this.codigoPostal = '',
-    this.uso = '',
-    this.latitud = '',
-    this.longitud = '',
-    this.inspector = '',
-    this.fecha = '',
-    this.hora = '',
-    this.fotoEdificioXFile,
-    this.graficoEdificioXFile,
-    this.pisos = '',
-    this.area = '',
-    this.anioConstruccion = '',
-    this.anioCodigo = '',
-    this.ampliacionSi = false,
-    this.anioAmpliacion = '',
-    this.verificacion = '',
-  });
+  const BuildingRegistry4Screen({super.key});
 
   @override
   State<BuildingRegistry4Screen> createState() =>
@@ -71,8 +33,30 @@ class _BuildingRegistry4ScreenState extends State<BuildingRegistry4Screen> {
     {"value": "Albergue", "label": "Albergue"},
     {"value": "Gubernamental", "label": "Gubernamental"},
     {"value": "Herramientas", "label": "Herramientas"},
-    {"value": "Otro", "label": "Otro"},
+    {"value": "Otro (Especificar)", "label": "Otro (Especificar)"},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final formData = BuildingFormData();
+    unidadesController.text = formData.unidades;
+    
+    if (formData.ocupacion.isNotEmpty) {
+      bool found = false;
+      for (var opc in _tipoOpciones) {
+        if (opc['value'] == formData.ocupacion) {
+          _tipoSeleccionado = formData.ocupacion;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        _tipoSeleccionado = "Otro (Especificar)";
+        otraOcupacionController.text = formData.ocupacion;
+      }
+    }
+  }
 
   void _onItemTapped(int index) {
     if (index >= 0 && index < 2) {
@@ -87,52 +71,19 @@ class _BuildingRegistry4ScreenState extends State<BuildingRegistry4Screen> {
 
   void _siguiente() {
     if (_formKey.currentState!.validate()) {
-      debugPrint("Tipo seleccionado: $_tipoSeleccionado");
-      debugPrint("Otra ocupación: ${otraOcupacionController.text}");
-      debugPrint("Unidades: ${unidadesController.text}");
-
-      // NUEVA LÓGICA: Derivar campos booleanos de la ocupación seleccionada
-      final bool esHistorico = _tipoSeleccionado == "Histórico";
-      final bool esAlbergue = _tipoSeleccionado == "Albergue";
-      final bool esGubernamental = _tipoSeleccionado == "Gubernamental";
-
-      // Log para verificar la derivación (remover en producción)
-      debugPrint("Booleanos derivados:");
-      debugPrint("  - histórico: $esHistorico");
-      debugPrint("  - albergue: $esAlbergue");
-      debugPrint("  - gubernamental: $esGubernamental");
+      final formData = BuildingFormData();
+      formData.unidades = unidadesController.text;
+      
+      String ocupacionFinal = _tipoSeleccionado ?? "";
+      if (ocupacionFinal == "Otro (Especificar)") {
+        ocupacionFinal = otraOcupacionController.text.trim();
+      }
+      formData.ocupacion = ocupacionFinal;
 
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => BuildingRegistry5Screen(
-            // Pasar todos los parámetros de las pantallas anteriores
-            nombre: widget.nombre,
-            direccion: widget.direccion,
-            codigoPostal: widget.codigoPostal,
-            uso: widget.uso,
-            latitud: widget.latitud,
-            longitud: widget.longitud,
-            inspector: widget.inspector,
-            fecha: widget.fecha,
-            hora: widget.hora,
-            fotoEdificioXFile: widget.fotoEdificioXFile,
-            graficoEdificioXFile: widget.graficoEdificioXFile,
-            pisos: widget.pisos,
-            area: widget.area,
-            anioConstruccion: widget.anioConstruccion,
-            ampliacionSi: widget.ampliacionSi,
-            anioAmpliacion: widget.anioAmpliacion,
-            anioCodigo: widget.anioCodigo,
-            verificacion: widget.verificacion,
-            ocupacion: _tipoSeleccionado ?? '',
-            unidades: unidadesController.text,
-
-            // CAMPOS CORREGIDOS: Ahora se derivan correctamente de la selección
-            historico: esHistorico,
-            albergue: esAlbergue,
-            gubernamental: esGubernamental,
-          ),
+          builder: (_) => const BuildingRegistry5Screen(),
         ),
       );
     }
@@ -344,24 +295,55 @@ class _BuildingRegistry4ScreenState extends State<BuildingRegistry4Screen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               color: Colors.white,
-              child: ElevatedButton(
-                onPressed: _siguiente,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: _siguiente,
+                      child: const Text(
+                        "Siguiente",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  "Siguiente",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: AppColors.primary),
+                        ),
+                      ),
+                      onPressed: () {
+                        final formData = BuildingFormData();
+                        formData.unidades = unidadesController.text;
+                        String ocupacionFinal = _tipoSeleccionado ?? "";
+                        if (ocupacionFinal == "Otro (Especificar)") {
+                          ocupacionFinal = otraOcupacionController.text.trim();
+                        }
+                        formData.ocupacion = ocupacionFinal;
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        "Regresar",
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ],

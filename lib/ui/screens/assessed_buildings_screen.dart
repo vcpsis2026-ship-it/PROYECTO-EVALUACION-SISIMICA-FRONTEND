@@ -5,6 +5,7 @@ import '../../core/services/building_list_service.dart';
 import '../../data/models/building_list_response.dart';
 import 'profile_admin_screen.dart';
 import 'building_pdf_service.dart';
+import 'building_inspections_screen.dart';
 
 class AssessedBuildingsPage extends StatefulWidget {
   const AssessedBuildingsPage({super.key});
@@ -217,71 +218,81 @@ class _AssessedBuildingsPageState extends State<AssessedBuildingsPage> {
   }
 
   Widget _buildEdificioCard(BuildingData edificio) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Foto del edificio
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: edificio.fotoUrl != null
-                  ? Image.network(
-                      edificio.fotoUrl!,
-                      height: 80,
-                      width: 100,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const _EdificioPlaceholder(),
-                    )
-                  : const _EdificioPlaceholder(),
-            ),
-            const SizedBox(height: 8),
-            // Nombre
-            Text(
-              edificio.nombreEdificio,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: AppColors.text,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BuildingInspectionsScreen(edificio: edificio),
+          ),
+        );
+      },
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Foto del edificio
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: edificio.fotoUrl != null
+                    ? Image.network(
+                        edificio.fotoUrl!,
+                        height: 80,
+                        width: 100,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const _EdificioPlaceholder(),
+                      )
+                    : const _EdificioPlaceholder(),
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-            // Dirección (si existe)
-            if (edificio.direccion != null) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
+              // Nombre
               Text(
-                edificio.direccion!,
-                style: const TextStyle(fontSize: 11, color: AppColors.gray500),
-                maxLines: 1,
+                edificio.nombreEdificio,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.text,
+                ),
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
               ),
-            ],
-            const SizedBox(height: 8),
-            // Botón PDF
-            ElevatedButton.icon(
-              onPressed: () async {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Generando reporte PDF...')),
-                );
-                await BuildingPdfService.generateFullReport(edificio.idEdificio);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+              // Dirección (si existe)
+              if (edificio.direccion != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  edificio.direccion!,
+                  style: const TextStyle(fontSize: 11, color: AppColors.gray500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              const SizedBox(height: 8),
+              // Botón PDF
+              ElevatedButton.icon(
+                onPressed: () async {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Generando reporte PDF...')),
+                  );
+                  await BuildingPdfService.generateFullReport(edificio.idEdificio);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.picture_as_pdf, size: 18),
+                label: const Text('PDF', style: TextStyle(fontSize: 12)),
               ),
-              icon: const Icon(Icons.picture_as_pdf, size: 18),
-              label: const Text('PDF', style: TextStyle(fontSize: 12)),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

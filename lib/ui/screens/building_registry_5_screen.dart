@@ -3,60 +3,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import '../../core/services/building_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/models/building_form_data.dart';
 import 'exten_revis.dart';
 class BuildingRegistry5Screen extends StatefulWidget {
-  final String nombre;
-  final String direccion;
-  final String ciudad;
-  final String codigoPostal;
-  final String uso;
-  final String latitud;
-  final String longitud;
-  final String inspector;
-  final String fecha;
-  final String hora;
-  final XFile? fotoEdificioXFile;
-  final XFile? graficoEdificioXFile;
-  final String pisos;
-  final String area;
-  final String anioConstruccion;
-  final String anioCodigo;
-  final bool ampliacionSi;
-  final String anioAmpliacion;
-  final String verificacion;
-  final String ocupacion;
-  final String unidades;
-  final bool historico;
-  final bool albergue;
-  final bool gubernamental;
-
-  const BuildingRegistry5Screen({
-    super.key,
-    this.nombre = '',
-    this.direccion = '',
-    this.ciudad = 'nom',
-    this.codigoPostal = '',
-    this.uso = '',
-    this.latitud = '',
-    this.longitud = '',
-    this.inspector = '',
-    this.fecha = '',
-    this.hora = '',
-    this.fotoEdificioXFile,
-    this.graficoEdificioXFile,
-    this.pisos = '',
-    this.area = '',
-    this.anioConstruccion = '',
-    this.anioCodigo = '',
-    this.ampliacionSi = false,
-    this.anioAmpliacion = '',
-    this.verificacion = '',
-    this.ocupacion = '',
-    this.unidades = '',
-    this.historico = false,
-    this.albergue = false,
-    this.gubernamental = false,
-  });
+  const BuildingRegistry5Screen({super.key});
 
   @override
   State<BuildingRegistry5Screen> createState() =>
@@ -81,8 +31,11 @@ class _BuildingRegistry5ScreenState extends State<BuildingRegistry5Screen> {
   @override
   void initState() {
     super.initState();
-    // valor por defecto = D: Suelo rígido
-    _tipoSueloSeleccionado = "D";
+    final formData = BuildingFormData();
+    comentariosController.text = formData.comentarios;
+    _tipoSueloSeleccionado = formData.tipoSueloSeleccionado.isNotEmpty 
+        ? formData.tipoSueloSeleccionado 
+        : null;
   }
 
   Future<void> _guardarEdificio() async {
@@ -93,24 +46,21 @@ class _BuildingRegistry5ScreenState extends State<BuildingRegistry5Screen> {
     });
 
     try {
-      // Parseo seguro de campos numéricos
-      final latitudParsed = double.tryParse(widget.latitud.trim());
-      final longitudParsed = double.tryParse(widget.longitud.trim());
-      final pisosParsed = int.tryParse(widget.pisos.trim());
-      final areaParsed = double.tryParse(widget.area.trim());
-      final anioConstruccionParsed = int.tryParse(widget.anioConstruccion.trim());
-      final anioCodigoText = widget.anioCodigo.trim();
-      final anioCodigoParsed = int.tryParse(anioCodigoText);
-      final anioAmpliacionParsed = widget.ampliacionSi && widget.anioAmpliacion.isNotEmpty
-          ? int.tryParse(widget.anioAmpliacion.trim())
-          : null;
-      final unidadesParsed = int.tryParse(widget.unidades.trim());
+      final formData = BuildingFormData();
+      // Guardar últimos datos
+      formData.comentarios = comentariosController.text;
+      formData.tipoSueloSeleccionado = _tipoSueloSeleccionado ?? 'D';
+
+      double latitudParsed = double.tryParse(formData.latitud) ?? 0.0;
+      double longitudParsed = double.tryParse(formData.longitud) ?? 0.0;
+      int? pisosParsed = int.tryParse(formData.pisos);
+      double? areaParsed = double.tryParse(formData.area);
+      int? anioConstruccionParsed = int.tryParse(formData.anioConstruccion);
+      int? anioCodigoParsed = int.tryParse(formData.anioCodigo);
+      int? anioAmpliacionParsed = int.tryParse(formData.anioAmpliacion);
+      int? unidadesParsed = int.tryParse(formData.unidades);
 
       // Validaciones de campos obligatorios
-      if (latitudParsed == null || longitudParsed == null) {
-        _showErrorDialog('Error de validación', 'Ingrese latitud y longitud válidas');
-        return;
-      }
       if (pisosParsed == null || pisosParsed <= 0) {
         _showErrorDialog('Error de validación', 'Ingrese un número de pisos válido');
         return;
@@ -134,7 +84,7 @@ class _BuildingRegistry5ScreenState extends State<BuildingRegistry5Screen> {
         );
         return;
       }
-      if (widget.ampliacionSi &&
+      if (formData.ampliacionSi &&
           (anioAmpliacionParsed == null || anioAmpliacionParsed <= anioConstruccionParsed)) {
         _showErrorDialog('Error de validación',
             'El año de ampliación debe ser posterior al año de construcción');
@@ -147,30 +97,30 @@ class _BuildingRegistry5ScreenState extends State<BuildingRegistry5Screen> {
 
       // Llamada al servicio para crear el edificio
       final response = await BuildingService.createBuilding(
-        nombreEdificio: widget.nombre.trim(),
-        direccion: widget.direccion.trim(),
-        ciudad: widget.ciudad.trim(),
-        codigoPostal: widget.codigoPostal.trim(),
-        usoPrincipal: widget.uso.trim(),
+        nombreEdificio: formData.nombre.trim(),
+        direccion: formData.direccion.trim(),
+        ciudad: formData.ciudad.trim().isNotEmpty ? formData.ciudad.trim() : 'nom',
+        codigoPostal: formData.codigoPostal.trim(),
+        usoPrincipal: formData.usoPrincipal.trim(),
         latitud: latitudParsed,
         longitud: longitudParsed,
         numeroPisos: pisosParsed,
         areaTotalPiso: areaParsed,
         anioConstruccion: anioConstruccionParsed,
         anioCodigo: anioCodigoParsed,
-        ampliacion: widget.ampliacionSi,
+        ampliacion: formData.ampliacionSi,
         anioAmpliacion: anioAmpliacionParsed,
-        ocupacion: widget.ocupacion.trim(),
-        historico: widget.historico,
-        albergue: widget.albergue,
-        gubernamental: widget.gubernamental,
+        ocupacion: formData.ocupacion.trim(),
+        historico: formData.historico,
+        albergue: formData.albergue,
+        gubernamental: formData.gubernamental,
         unidades: unidadesParsed,
-        otrasIdentificaciones: _tipoSueloSeleccionado,
-        comentarios: comentariosController.text.trim().isNotEmpty
-            ? comentariosController.text.trim()
+        otrasIdentificaciones: formData.tipoSueloSeleccionado,
+        comentarios: formData.comentarios.trim().isNotEmpty
+            ? formData.comentarios.trim()
             : null,
-        fotoEdificio: widget.fotoEdificioXFile,
-        graficoEdificio: widget.graficoEdificioXFile,
+        fotoEdificio: formData.fotoEdificioXFile,
+        graficoEdificio: formData.graficoEdificioXFile,
       );
 
       if (response.success) {
@@ -201,22 +151,48 @@ class _BuildingRegistry5ScreenState extends State<BuildingRegistry5Screen> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop(); // Cierra el diálogo
+              // Cierra el diálogo
+              Navigator.of(context).pop(); 
 
-              // --- CORRECCIÓN CLAVE AQUÍ ---
-              Navigator.push(
+              final formData = BuildingFormData();
+              formData.clear();
+
+              // Redirigir a Home y limpiar historial de registro
+              Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+            },
+            child: const Text('Más tarde'),
+          ),
+          TextButton(
+            onPressed: () {
+              // Cierra el diálogo
+              Navigator.of(context).pop(); 
+
+              final formData = BuildingFormData();
+
+              final String nombreGuardado = formData.nombre;
+              final String direccionGuardada = formData.direccion;
+              final String anioConstruccionGuardado = formData.anioConstruccion;
+              final String pisosGuardado = formData.pisos;
+              final String ciudadGuardada = formData.ciudad;
+
+              // Limpiamos los datos del formulario global
+              formData.clear();
+
+              // Redirigir a inspección y limpiar el historial para que no regrese al formulario
+              Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(
                   builder: (context) => ExtensionRevisionPage(
                     idEdificio: bId,
-                    nombreEdificio: widget.nombre,
-                    direccion: widget.direccion,
-                    anioConstruccion: widget.anioConstruccion,
+                    nombreEdificio: nombreGuardado,
+                    direccion: direccionGuardada,
+                    anioConstruccion: anioConstruccionGuardado,
                     tipoSuelo: _tipoSueloSeleccionado ?? 'D',
-                    numeroPisos: int.tryParse(widget.pisos) ?? 0,
-                    ciudad: widget.ciudad,
+                    numeroPisos: int.tryParse(pisosGuardado) ?? 0,
+                    ciudad: ciudadGuardada,
                   ),
                 ),
+                ModalRoute.withName('/home'), // Regresará al Home o BuildingsScreen
               );
             },
             child: const Text('Comenzar Inspección'),
@@ -324,63 +300,100 @@ class _BuildingRegistry5ScreenState extends State<BuildingRegistry5Screen> {
               const SizedBox(height: 30),
 
               // Mostrar resumen de datos
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Resumen del edificio:",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+              Builder(
+                builder: (context) {
+                  final formData = BuildingFormData();
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Resumen del edificio:",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text("Nombre: ${formData.nombre}"),
+                          Text("Dirección: ${formData.direccion}"),
+                          Text("Ciudad: ${formData.ciudad}"),
+                          Text("Año del codigo: ${formData.anioCodigo}"),
+                          Text("Pisos: ${formData.pisos}"),
+                          Text("Área por piso: ${formData.area} m²"),
+                          Text("Año construcción: ${formData.anioConstruccion}"),
+                          Text("Unidades: ${formData.unidades}"),
+                          Text("Fotos: ${formData.fotoEdificioXFile != null ? 'Sí' : 'No'}"),
+                          Text("Gráfico: ${formData.graficoEdificioXFile != null ? 'Sí' : 'No'}"),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      Text("Nombre: ${widget.nombre}"),
-                      Text("Dirección: ${widget.direccion}"),
-                      Text("Ciudad: ${widget.ciudad}"),
-                      Text("Año del codigo: ${widget.anioCodigo}"),
-                      Text("Pisos: ${widget.pisos}"),
-                      Text("Área por piso: ${widget.area} m²"),
-                      Text("Año construcción: ${widget.anioConstruccion}"),
-                      Text("Unidades: ${widget.unidades}"),
-                      Text("Fotos: ${widget.fotoEdificioXFile != null ? 'Sí' : 'No'}"),
-                      Text("Gráfico: ${widget.graficoEdificioXFile != null ? 'Sí' : 'No'}"),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                }
               ),
               const SizedBox(height: 20),
 
-              // Botón guardar
-              ElevatedButton(
-                onPressed: _isLoading ? null : _guardarEdificio,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isLoading
-                    ? const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
+              // Botones Guardar y Regresar
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _guardarEdificio,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    SizedBox(width: 12),
-                    Text("Guardando edificio..."),
-                  ],
-                )
-                    : const Text(
-                  "Guardar edificio",
-                  style: TextStyle(fontSize: 16),
+                  ),
+                  child: _isLoading
+                      ? const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Text("Guardando edificio..."),
+                    ],
+                  )
+                      : const Text(
+                    "Guardar edificio",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                    final formData = BuildingFormData();
+                    formData.comentarios = comentariosController.text;
+                    formData.tipoSueloSeleccionado = _tipoSueloSeleccionado ?? '';
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    "Regresar",
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],

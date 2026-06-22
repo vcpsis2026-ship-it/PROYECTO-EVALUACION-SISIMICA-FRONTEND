@@ -69,7 +69,7 @@ class _ResumenPageState extends State<ResumenPage> {
 
       final Map<String, dynamic> data = {
         "id_edificio": widget.idEdificio,
-        "id_usuario": int.parse(userId),
+        "id_usuario": userId,
         "fecha_inspeccion": DateTime.now().toIso8601String().split('T')[0],
         "puntuacion_final": _puntajeCalculado,
         "estado": "completada",
@@ -106,9 +106,13 @@ class _ResumenPageState extends State<ResumenPage> {
           ),
               (route) => route.isFirst,
         );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al guardar la inspección (Verifique la consola para detalles)")));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al conectar con el servidor")));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error al conectar con el servidor: $e")));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

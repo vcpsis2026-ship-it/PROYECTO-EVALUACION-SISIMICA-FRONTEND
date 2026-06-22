@@ -19,6 +19,13 @@ class _UserListScreenState extends State<UserListScreen> {
   String _searchQuery = '';
   String? _errorMessage;
   String _selectedFilter = 'todos'; // todos, sin_rol, inspector, ayudante
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -165,14 +172,14 @@ class _UserListScreenState extends State<UserListScreen> {
             padding: const EdgeInsets.all(16),
             color: Colors.white,
             child: TextField(
+              controller: _searchController,
               decoration: const InputDecoration(
-                hintText: "Buscar por nombre, cédula o email",
+                hintText: "Busque por nombre o cédula",
                 prefixIcon: Icon(Icons.search, color: AppColors.primary),
                 border: OutlineInputBorder(),
                 contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               onChanged: _filterUsers,
-              controller: TextEditingController(text: _searchQuery),
             ),
           ),
 

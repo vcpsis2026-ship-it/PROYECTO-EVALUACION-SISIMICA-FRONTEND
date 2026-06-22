@@ -62,5 +62,22 @@ class DatabaseEndpoints {
   static String rolesByUsuarioId(String id) => '$rolesByUsuario/$id';
 
   /// Construye: /permisos/rol/<idRol>
+  /// Construye: /permisos/rol/<idRol>
   static String permisosByRol(String idRol) => '$permisosRol/$idRol';
+
+  // ── Inspecciones helpers ──────────────────────────────────────
+  /// GET /inspecciones/edificio/<idEdificio>
+  static String inspeccionesByEdificio(int id) => '$inspecciones/edificio/$id';
+
+  /// GET /inspecciones/<id>
+  static String inspeccionById(int id) => '$inspecciones/$id';
+
+  /// GET /inspecciones/<id>/archivos
+  static String inspeccionArchivos(int id) => '$inspecciones/$id/archivos';
+
+  /// GET /inspecciones/<id>/comentarios
+  static String inspeccionComentarios(int id) => '$inspecciones/$id/comentarios';
+
+  /// GET /inspecciones/<id>/resultados
+  static String inspeccionResultados(int id) => '$inspecciones/$id/resultados';
 }

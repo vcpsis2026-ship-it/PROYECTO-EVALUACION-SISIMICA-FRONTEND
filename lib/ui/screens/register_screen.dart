@@ -23,6 +23,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _nombreController = TextEditingController();
   final _emailController = TextEditingController();
   final _telefonoController = TextEditingController();
+  final _direccionController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -35,6 +36,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _nombreTouched = false;
   bool _emailTouched = false;
   bool _telefonoTouched = false;
+  bool _direccionTouched = false;
   bool _confirmPasswordTouched = false;
   String _completePhoneNumber = '';
   String? _usernameError;
@@ -89,6 +91,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nombreController.dispose();
     _emailController.dispose();
     _telefonoController.dispose();
+    _direccionController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -182,6 +185,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailController.text.trim(),
         phone: _completePhoneNumber,
         password: _passwordController.text,
+        direccion: _direccionController.text.trim(),
         maxRetries: 1, // SOLO 1 INTENTO PARA EVITAR PROBLEMAS DE TRANSACCIÓN
       );
 
@@ -264,6 +268,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     debugPrint('  - Rol: $_defaultRole ($_roleDisplayName)');
     debugPrint('  - Email: ${_emailController.text.trim()}');
     debugPrint('  - Teléfono: $_completePhoneNumber');
+    debugPrint('  - Dirección: ${_direccionController.text.trim()}');
   }
 
   Future<void> _updateSharedPreferences() async {
@@ -643,6 +648,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  Widget _buildDireccionField() {
+    return TextFormField(
+      controller: _direccionController,
+      decoration: InputDecoration(
+        labelText: 'Dirección',
+        border: const OutlineInputBorder(),
+        prefixIcon: const Icon(Icons.location_on),
+        helperText: _direccionTouched ? 'Ingrese su dirección' : null,
+      ),
+      enabled: !_isLoading,
+      onTap: () => setState(() => _direccionTouched = true),
+      validator: _validateDireccion,
+    );
+  }
+
   Widget _buildPasswordField() {
     return Column(
       children: [
@@ -869,6 +889,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
+  String? _validateDireccion(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'La dirección es requerida';
+    }
+    return null;
+  }
+
   String? _validatePassword(String? value) { // CORREGIDO: _ en lugar de *
     if (value == null || value.isEmpty) {
       return 'La contraseña es requerida';
@@ -946,6 +973,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         _buildEmailField(), // CORREGIDO: _ en lugar de *
                         const SizedBox(height: 12),
                         _buildPhoneField(), // CORREGIDO: _ en lugar de *
+                        const SizedBox(height: 12),
+                        _buildDireccionField(),
                         const SizedBox(height: 12),
                         _buildPasswordField(), // CORREGIDO: _ en lugar de *
                         const SizedBox(height: 12),

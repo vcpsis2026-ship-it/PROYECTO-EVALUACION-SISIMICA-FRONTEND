@@ -14,6 +14,7 @@ class RegisterService {
     required String phone,
     required String password,
     required String cedula,
+    required String direccion,
     File? fotoPerfil,
     int maxRetries = 2,
   }) async {
@@ -25,6 +26,7 @@ class RegisterService {
       phone: phone,
       password: password,
       cedula: cedula,
+      direccion: direccion,
     );
 
     if (validationError != null) {
@@ -48,6 +50,7 @@ class RegisterService {
           "rol": role, // USAR EL ROL QUE VIENE DEL REGISTER_SCREEN
           "cedula": cedula.trim(),
           "telefono": phone.replaceAll(RegExp(r'[^\d]'), ''),
+          "direccion": direccion.trim(),
         };
 
         // Procesar teléfono
@@ -262,7 +265,12 @@ class RegisterService {
     required String phone,
     required String password,
     required String cedula,
+    required String direccion,
   }) {
+    // Validar direccion
+    if (direccion.trim().isEmpty) {
+      return 'La dirección es requerida';
+    }
     // Validar cedula
     if (cedula.trim().isEmpty) {
       return 'La cédula es requerida';

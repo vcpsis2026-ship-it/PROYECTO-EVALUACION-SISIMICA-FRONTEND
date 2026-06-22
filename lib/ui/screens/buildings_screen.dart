@@ -18,6 +18,7 @@ import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'profile_admin_screen.dart';
 import 'reporte_detalle_screen.dart';
+import 'building_inspections_screen.dart';
 
 class BuildingsScreen extends StatefulWidget {
   const BuildingsScreen({super.key});
@@ -31,6 +32,7 @@ class BuildingsScreen extends StatefulWidget {
 class _BuildingsScreenState extends State<BuildingsScreen> {
   String? _userId;
   String? _token;
+  String? _userRole;
   List<BuildingData> _edificios = [];
   List<BuildingData> _filteredEdificios = [];
   bool _isLoading = false;
@@ -558,6 +560,7 @@ class _BuildingsScreenState extends State<BuildingsScreen> {
     setState(() {
       _userId = prefs.getString('userId');
       _token = prefs.getString('accessToken');
+      _userRole = prefs.getString('userRole');
     });
   }
 
@@ -565,8 +568,15 @@ class _BuildingsScreenState extends State<BuildingsScreen> {
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
     if (index == 0) {
-      // Si ya estás en edificios y quieres ir al Home real:
-      Navigator.pushReplacementNamed(context, '/home');
+      // Verificar el rol del usuario para redirigirlo a la pantalla principal correcta
+      if (_userRole != null && 
+         (_userRole!.toLowerCase() == 'administrador' || 
+          _userRole!.toLowerCase() == 'admin' || 
+          _userRole == '1')) {
+        Navigator.pushReplacementNamed(context, '/home_admin');
+      } else {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
     } else if (index == 1) {
       // Verificar que tengamos los datos antes de navegar
       if (_userId != null && _token != null) {
@@ -788,15 +798,24 @@ class _BuildingsScreenState extends State<BuildingsScreen> {
         itemCount: _filteredEdificios.length,
         itemBuilder: (context, index) {
           final edificio = _filteredEdificios[index];
-          return Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            elevation: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
+          return GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BuildingInspectionsScreen(edificio: edificio),
+                ),
+              );
+            },
+            child: Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Foto del edificio
@@ -901,7 +920,8 @@ class _BuildingsScreenState extends State<BuildingsScreen> {
                 ],
               ),
             ),
-          );
+          ),
+        );
         },
       ),
     );

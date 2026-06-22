@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/models/building_form_data.dart';
 import 'building_registry_3_screen.dart';
 
 class LocationService {
@@ -88,20 +89,9 @@ class LocationService {
 }
 
 class BuildingRegistry2Screen extends StatefulWidget {
-  final String nombre;
-  final String direccion;
-  final String codigoPostal;
-  final XFile? fotoEdificioXFile;
-  final XFile? graficoEdificioXFile;
 
-  const BuildingRegistry2Screen({
-    super.key,
-    this.nombre = '',
-    this.direccion = '',
-    this.codigoPostal = '',
-    this.fotoEdificioXFile,
-    this.graficoEdificioXFile,
-  });
+
+  const BuildingRegistry2Screen({super.key});
 
   @override
   State<BuildingRegistry2Screen> createState() =>
@@ -126,8 +116,17 @@ class _BuildingRegistry2ScreenState extends State<BuildingRegistry2Screen> {
   @override
   void initState() {
     super.initState();
+    final formData = BuildingFormData();
+    otrasIdentificacionesController.text = formData.otrasIdentificaciones;
+    usoController.text = formData.usoPrincipal;
+    latitudController.text = formData.latitud;
+    longitudController.text = formData.longitud;
+    inspectorController.text = formData.inspector;
+    fechaController.text = formData.fecha;
+    horaController.text = formData.hora;
+    
     // Intentar obtener coordenadas de la dirección si está disponible
-    if (widget.direccion.isNotEmpty) {
+    if (formData.direccion.isNotEmpty && formData.latitud.isEmpty) {
       _getCoordinatesFromAddress();
     }
   }
@@ -186,7 +185,8 @@ class _BuildingRegistry2ScreenState extends State<BuildingRegistry2Screen> {
 
   // Obtener coordenadas a partir de la dirección del edificio
   void _getCoordinatesFromAddress() async {
-    if (widget.direccion.isEmpty) return;
+    final formData = BuildingFormData();
+    if (formData.direccion.isEmpty) return;
 
     setState(() {
       _isLoadingLocation = true;
@@ -194,7 +194,7 @@ class _BuildingRegistry2ScreenState extends State<BuildingRegistry2Screen> {
     });
 
     try {
-      Location? location = await LocationService.getCoordinatesFromAddress(widget.direccion);
+      Location? location = await LocationService.getCoordinatesFromAddress(formData.direccion);
 
       if (location != null) {
         setState(() {
@@ -238,23 +238,19 @@ class _BuildingRegistry2ScreenState extends State<BuildingRegistry2Screen> {
 
   void _siguiente() {
     if (_formKey.currentState!.validate()) {
+      final formData = BuildingFormData();
+      formData.otrasIdentificaciones = otrasIdentificacionesController.text;
+      formData.usoPrincipal = usoController.text;
+      formData.latitud = latitudController.text;
+      formData.longitud = longitudController.text;
+      formData.inspector = inspectorController.text;
+      formData.fecha = fechaController.text;
+      formData.hora = horaController.text;
+
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => BuildingRegistry3Screen(
-            nombre: widget.nombre,
-            direccion: widget.direccion,
-            codigoPostal: widget.codigoPostal,
-            fotoEdificioXFile: widget.fotoEdificioXFile,
-            graficoEdificioXFile: widget.graficoEdificioXFile,
-            otrasIdentificaciones: otrasIdentificacionesController.text,
-            uso: usoController.text,
-            latitud: latitudController.text,
-            longitud: longitudController.text,
-            inspector: inspectorController.text,
-            fecha: fechaController.text,
-            hora: horaController.text,
-          ),
+          builder: (context) => const BuildingRegistry3Screen(),
         ),
       );
     }
@@ -518,6 +514,35 @@ class _BuildingRegistry2ScreenState extends State<BuildingRegistry2Screen> {
                   child: const Text(
                     "Siguiente",
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                  onPressed: () {
+                    final formData = BuildingFormData();
+                    formData.otrasIdentificaciones = otrasIdentificacionesController.text;
+                    formData.usoPrincipal = usoController.text;
+                    formData.latitud = latitudController.text;
+                    formData.longitud = longitudController.text;
+                    formData.inspector = inspectorController.text;
+                    formData.fecha = fechaController.text;
+                    formData.hora = horaController.text;
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    "Regresar",
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

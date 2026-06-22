@@ -45,6 +45,7 @@ class MyApp extends StatelessWidget {
       initialRoute: '/', // 👈 Pantalla inicial
       routes: {
         '/': (_) => const LoginScreen(),
+        '/login': (_) => const LoginScreen(),
         '/assessed': (_) => const AssessedBuildingsPage(),
         //'/roles/assign': (_) => const AssignRoleScreen(),
         '/buildingRegistry1': (_) => const BuildingRegistry1Screen(),

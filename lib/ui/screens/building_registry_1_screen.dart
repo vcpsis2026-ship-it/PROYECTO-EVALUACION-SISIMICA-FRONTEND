@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/models/building_form_data.dart';
 import 'building_registry_2_screen.dart';
 
 class BuildingRegistry1Screen extends StatefulWidget {
@@ -27,6 +28,29 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
   Uint8List? _graficoBytes;
 
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final formData = BuildingFormData();
+    nombreController.text = formData.nombre;
+    direccionController.text = formData.direccion;
+    codigoPostalController.text = formData.codigoPostal;
+    _fotoXFile = formData.fotoEdificioXFile;
+    _graficoXFile = formData.graficoEdificioXFile;
+    
+    // Cargar bytes si las imágenes existen
+    if (_fotoXFile != null) {
+      _fotoXFile!.readAsBytes().then((bytes) {
+        if (mounted) setState(() => _fotoBytes = bytes);
+      });
+    }
+    if (_graficoXFile != null) {
+      _graficoXFile!.readAsBytes().then((bytes) {
+        if (mounted) setState(() => _graficoBytes = bytes);
+      });
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
@@ -132,17 +156,17 @@ class _BuildingRegistry1ScreenState extends State<BuildingRegistry1Screen> {
         return;
       }
 
+      final formData = BuildingFormData();
+      formData.nombre = nombreController.text;
+      formData.direccion = direccionController.text;
+      formData.codigoPostal = codigoPostalController.text;
+      formData.fotoEdificioXFile = _fotoXFile;
+      formData.graficoEdificioXFile = _graficoXFile;
+
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => BuildingRegistry2Screen(
-            nombre: nombreController.text,
-            direccion: direccionController.text,
-            codigoPostal: codigoPostalController.text,
-            // Pasar XFile en vez de File para compatibilidad web
-            fotoEdificioXFile: _fotoXFile,
-            graficoEdificioXFile: _graficoXFile,
-          ),
+          builder: (context) => const BuildingRegistry2Screen(),
         ),
       );
     }

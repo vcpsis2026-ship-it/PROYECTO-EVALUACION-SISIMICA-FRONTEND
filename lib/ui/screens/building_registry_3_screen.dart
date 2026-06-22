@@ -1,37 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/models/building_form_data.dart';
 import 'building_registry_4_screen.dart';
 
 class BuildingRegistry3Screen extends StatefulWidget {
-  final String nombre;
-  final String direccion;
-  final String codigoPostal;
-  final String uso;
-  final String latitud;
-  final String longitud;
-  final String inspector;
-  final XFile? fotoEdificioXFile;
-  final XFile? graficoEdificioXFile;
-  final String otrasIdentificaciones;
-  final String fecha;
-  final String hora;
-
-  const BuildingRegistry3Screen({
-    super.key,
-    this.nombre = "",
-    this.direccion = "",
-    this.codigoPostal = "",
-    this.uso = "",
-    this.latitud = "",
-    this.longitud = "",
-    this.inspector = "",
-    this.fotoEdificioXFile,
-    this.graficoEdificioXFile,
-    this.otrasIdentificaciones= "",
-    this.fecha= "",
-    this.hora= "",
-  });
+  const BuildingRegistry3Screen({super.key});
 
   @override
   State<BuildingRegistry3Screen> createState() => _BuildingRegistry3ScreenState();
@@ -55,6 +29,18 @@ class _BuildingRegistry3ScreenState extends State<BuildingRegistry3Screen> {
 
   final List<String> _verificacionOpciones = ["REAL", "EST", "DNK"];
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final formData = BuildingFormData();
+    pisosController.text = formData.pisos;
+    areaController.text = formData.area;
+    anioConstruccionController.text = formData.anioConstruccion;
+    anioCodigoController.text = formData.anioCodigo;
+    anioAmpliacionController.text = formData.anioAmpliacion;
+    _ampliacionSi = formData.ampliacionSi;
+  }
 
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
@@ -156,29 +142,18 @@ class _BuildingRegistry3ScreenState extends State<BuildingRegistry3Screen> {
 
   void _siguiente() {
     if (_formKey.currentState!.validate()) {
+      final formData = BuildingFormData();
+      formData.pisos = pisosController.text;
+      formData.area = areaController.text;
+      formData.anioConstruccion = anioConstruccionController.text;
+      formData.anioCodigo = anioCodigoController.text;
+      formData.anioAmpliacion = anioAmpliacionController.text;
+      formData.ampliacionSi = _ampliacionSi;
+
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => BuildingRegistry4Screen(
-            nombre: widget.nombre,
-            direccion: widget.direccion,
-            codigoPostal: widget.codigoPostal,
-            uso: widget.uso,
-            latitud: widget.latitud,
-            longitud: widget.longitud,
-            inspector: widget.inspector,
-            fecha: widget.fecha,
-            hora: widget.hora,
-            fotoEdificioXFile: widget.fotoEdificioXFile,
-            graficoEdificioXFile: widget.graficoEdificioXFile,
-            pisos: pisosController.text,
-            area: areaController.text,
-            anioCodigo: anioCodigoController.text,
-            anioConstruccion: anioConstruccionController.text,
-            ampliacionSi: _ampliacionSi,
-            anioAmpliacion: anioAmpliacionController.text,
-            verificacion: _pisosVerificacion, // Puedes decidir cuál usar como principal
-          ),
+          builder: (_) => const BuildingRegistry4Screen(),
         ),
       );
     }
@@ -406,25 +381,56 @@ class _BuildingRegistry3ScreenState extends State<BuildingRegistry3Screen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
-              color: Colors.white,
-              child: ElevatedButton(
-                onPressed: _siguiente,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: _siguiente,
+                      child: const Text(
+                        "Siguiente",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  "Siguiente",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: AppColors.primary),
+                        ),
+                      ),
+                      onPressed: () {
+                        final formData = BuildingFormData();
+                        formData.pisos = pisosController.text;
+                        formData.area = areaController.text;
+                        formData.anioConstruccion = anioConstruccionController.text;
+                        formData.anioCodigo = anioCodigoController.text;
+                        formData.anioAmpliacion = anioAmpliacionController.text;
+                        formData.ampliacionSi = _ampliacionSi;
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        "Regresar",
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                ],
               ),
             ),
           ],

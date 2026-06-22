@@ -162,7 +162,9 @@ class BuildingService {
           final data = response.data!;
 
           // Extraer información del edificio creado
-          final buildingId = data['id_edificio'] as int?;
+          final buildingId = data['id_edificio'] != null 
+              ? int.tryParse(data['id_edificio'].toString()) 
+              : null;
 
           print('Datos extraídos de la creación:');
           print('  - buildingId: $buildingId');
